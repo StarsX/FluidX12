@@ -28,19 +28,24 @@ bool Fluid::Init(const CommandList& commandList, shared_ptr<DescriptorTableCache
 	m_gridSize = dim;
 
 	// Create resources
-	N_RETURN(m_incompress.Create(m_device, dim.x, dim.y, dim.z, Format::R32_FLOAT,
-		ResourceFlag::ALLOW_UNORDERED_ACCESS | ResourceFlag::ALLOW_SIMULTANEOUS_ACCESS,
-		1, MemoryType::DEFAULT, L"Incompressibility"), false);
-
 	for (auto i = 0ui8; i < 2; ++i)
 	{
 		N_RETURN(m_velocities[i].Create(m_device, dim.x, dim.y, dim.z, Format::R16G16B16A16_FLOAT,
 			ResourceFlag::ALLOW_UNORDERED_ACCESS | ResourceFlag::ALLOW_SIMULTANEOUS_ACCESS,
 			1, MemoryType::DEFAULT, (L"Velocity" + to_wstring(i)).c_str()), false);
+
 		N_RETURN(m_dyes[i].Create(m_device, dim.x, dim.y, dim.z, Format::R8G8B8A8_UNORM,
-			ResourceFlag::ALLOW_UNORDERED_ACCESS | ResourceFlag::ALLOW_SIMULTANEOUS_ACCESS,
-			1, MemoryType::DEFAULT, (L"Dye" + to_wstring(i)).c_str()), false);
+			ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryType::DEFAULT,
+			(L"Dye" + to_wstring(i)).c_str()), false);
 	}
+
+	N_RETURN(m_incompress.Create(m_device, dim.x, dim.y, dim.z, Format::R32_FLOAT,
+		ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryType::DEFAULT,
+		L"Incompressibility"), false);
+
+	ResourceBarrier barrier;
+	const auto numBarriers = m_incompress.SetBarrier(&barrier, ResourceState::UNORDERED_ACCESS);
+	commandList.Barrier(numBarriers, &barrier);
 
 	// Create pipelines
 	N_RETURN(createPipelineLayouts(), false);
@@ -59,12 +64,13 @@ void Fluid::UpdateFrame(float timeStep, const CXMMATRIX viewProj)
 
 void Fluid::Simulate(const CommandList& commandList)
 {
-	ResourceBarrier barriers[4];
+	ResourceBarrier barriers[3];
+
+	// Advection
 	{
-		// Set barriers
-		auto numBarriers = m_incompress.SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE);
-		numBarriers = m_velocities[0].SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE, numBarriers);
-		numBarriers = m_velocities[1].SetBarrier(barriers, ResourceState::UNORDERED_ACCESS, numBarriers);
+		// Set barriers (promotions)
+		m_velocities[0].SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE);
+		auto numBarriers = m_velocities[1].SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
 		numBarriers = m_dyes[m_frameParity].SetBarrier(barriers, ResourceState::UNORDERED_ACCESS, numBarriers);
 		commandList.Barrier(numBarriers, barriers);
 
@@ -81,10 +87,10 @@ void Fluid::Simulate(const CommandList& commandList)
 		commandList.Dispatch(DIV_UP(m_gridSize.x, 8), DIV_UP(m_gridSize.y, 8), m_gridSize.z);
 	}
 
+	// Projection
 	{
 		// Set barriers
-		auto numBarriers = m_incompress.SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
-		numBarriers = m_velocities[0].SetBarrier(barriers, ResourceState::UNORDERED_ACCESS, numBarriers);
+		auto numBarriers = m_velocities[0].SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
 		numBarriers = m_velocities[1].SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE, numBarriers);
 		numBarriers = m_dyes[m_frameParity].SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE |
 			ResourceState::PIXEL_SHADER_RESOURCE, numBarriers);
