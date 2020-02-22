@@ -23,19 +23,10 @@ public:
 	void Render2D(const XUSG::CommandList& commandList);
 
 protected:
-	enum PipelineLayoutIndex : uint8_t
+	enum PipelineIndex : uint8_t
 	{
 		ADVECT,
 		PROJECT,
-		VISUALIZE_2D,
-
-		NUM_PIPELINE_LAYOUT
-	};
-
-	enum PipelineIndex : uint8_t
-	{
-		ADVECT_2D,
-		PROJECT_2D,
 		VISUALIZE_DYE,
 
 		NUM_PIPELINE
@@ -63,7 +54,7 @@ protected:
 	XUSG::PipelineLayoutCache		m_pipelineLayoutCache;
 	std::shared_ptr<XUSG::DescriptorTableCache> m_descriptorTableCache;
 
-	XUSG::PipelineLayout	m_pipelineLayouts[NUM_PIPELINE_LAYOUT];
+	XUSG::PipelineLayout	m_pipelineLayouts[NUM_PIPELINE];
 	XUSG::Pipeline			m_pipelines[NUM_PIPELINE];
 
 	XUSG::DescriptorTable	m_srvUavTables[NUM_SRV_UAV_TABLE];

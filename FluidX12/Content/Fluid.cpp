@@ -76,7 +76,7 @@ void Fluid::Simulate(const CommandList& commandList)
 
 		// Set pipeline state
 		commandList.SetComputePipelineLayout(m_pipelineLayouts[ADVECT]);
-		commandList.SetPipelineState(m_pipelines[ADVECT_2D]);
+		commandList.SetPipelineState(m_pipelines[ADVECT]);
 
 		// Set descriptor tables
 		commandList.SetCompute32BitConstant(0, reinterpret_cast<uint32_t&>(m_timeStep));
@@ -98,7 +98,7 @@ void Fluid::Simulate(const CommandList& commandList)
 
 		// Set pipeline state
 		commandList.SetComputePipelineLayout(m_pipelineLayouts[PROJECT]);
-		commandList.SetPipelineState(m_pipelines[PROJECT_2D]);
+		commandList.SetPipelineState(m_pipelines[PROJECT]);
 
 		// Set descriptor tables
 		commandList.SetComputeDescriptorTable(0, m_srvUavTables[SRV_UAV_TABLE_VECOLITY1]);
@@ -110,7 +110,7 @@ void Fluid::Simulate(const CommandList& commandList)
 void Fluid::Render2D(const CommandList& commandList)
 {
 	// Set pipeline state
-	commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[VISUALIZE_2D]);
+	commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[VISUALIZE_DYE]);
 	commandList.SetPipelineState(m_pipelines[VISUALIZE_DYE]);
 
 	commandList.IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);
@@ -153,8 +153,8 @@ bool Fluid::createPipelineLayouts()
 		pipelineLayout.SetRange(1, DescriptorType::SAMPLER, 1, 0);
 		pipelineLayout.SetShaderStage(0, Shader::PS);
 		pipelineLayout.SetShaderStage(1, Shader::PS);
-		X_RETURN(m_pipelineLayouts[VISUALIZE_2D], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
-			PipelineLayoutFlag::NONE, L"Visualization2DLayout"), false);
+		X_RETURN(m_pipelineLayouts[VISUALIZE_DYE], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
+			PipelineLayoutFlag::NONE, L"DyeVisualizationLayout"), false);
 	}
 
 	// Ray casting
@@ -179,24 +179,24 @@ bool Fluid::createPipelines(Format rtFormat)
 	auto psIndex = 0u;
 	auto csIndex = 0u;
 
-	// Advection 2D
+	// Advection
 	{
 		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::CS, csIndex, L"CSAdvect2D.cso"), false);
 
 		Compute::State state;
 		state.SetPipelineLayout(m_pipelineLayouts[ADVECT]);
 		state.SetShader(m_shaderPool.GetShader(Shader::Stage::CS, csIndex++));
-		X_RETURN(m_pipelines[ADVECT_2D], state.GetPipeline(m_computePipelineCache, L"Advection2D"), false);
+		X_RETURN(m_pipelines[ADVECT], state.GetPipeline(m_computePipelineCache, L"Advection2D"), false);
 	}
 
-	// Projection 2D
+	// Projection
 	{
 		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::CS, csIndex, L"CSProject2D.cso"), false);
 
 		Compute::State state;
 		state.SetPipelineLayout(m_pipelineLayouts[PROJECT]);
 		state.SetShader(m_shaderPool.GetShader(Shader::Stage::CS, csIndex++));
-		X_RETURN(m_pipelines[PROJECT_2D], state.GetPipeline(m_computePipelineCache, L"Projection2D"), false);
+		X_RETURN(m_pipelines[PROJECT], state.GetPipeline(m_computePipelineCache, L"Projection2D"), false);
 	}
 
 	// Ray casting
@@ -205,13 +205,13 @@ bool Fluid::createPipelines(Format rtFormat)
 		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::PS, psIndex, L"PSVisualizeDye.cso"), false);
 
 		Graphics::State state;
-		state.SetPipelineLayout(m_pipelineLayouts[VISUALIZE_2D]);
+		state.SetPipelineLayout(m_pipelineLayouts[VISUALIZE_DYE]);
 		state.SetShader(Shader::Stage::VS, m_shaderPool.GetShader(Shader::Stage::VS, vsIndex));
 		state.SetShader(Shader::Stage::PS, m_shaderPool.GetShader(Shader::Stage::PS, psIndex++));
 		state.IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
 		state.DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache);
 		state.OMSetRTVFormats(&rtFormat, 1);
-		X_RETURN(m_pipelines[VISUALIZE_DYE], state.GetPipeline(m_graphicsPipelineCache, L"VisualizeDye"), false);
+		X_RETURN(m_pipelines[VISUALIZE_DYE], state.GetPipeline(m_graphicsPipelineCache, L"DyeVisualization"), false);
 	}
 
 	// Ray casting
