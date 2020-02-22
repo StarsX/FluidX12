@@ -166,7 +166,7 @@
     <None Include="XUSG\Core\XUSGSampler.inl">
       <Filter>XUSG\Core\Source Files\Inc</Filter>
     </None>
-    <None Include="Content\Shaders\CSProject.hlsli">
+    <None Include="Content\Shaders\CSPoisson.hlsli">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

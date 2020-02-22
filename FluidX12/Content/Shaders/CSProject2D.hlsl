@@ -8,7 +8,9 @@
 #define D 3
 #define N 4
 
-#include "CSProject.hlsli"
+#define ITER 48
+
+#include "CSPoisson.hlsli"
 
 static const float g_restDensity = 0.8;
 
@@ -32,6 +34,19 @@ float GetDivergence(Texture3D<float3> txU, uint3 cells[N])
 
 	// Compute the divergence using central differences
 	return 0.5 * (fR - fL + fD - fU);
+}
+
+//--------------------------------------------------------------------------------------
+// Projection
+//--------------------------------------------------------------------------------------
+void Project(RWTexture3D<float> rwQ, inout float3 u, uint3 cells[N])
+{
+	float q[N];
+	[unroll] for (uint i = 0; i < N; ++i) q[i] = rwQ[cells[i]];
+
+	// Project the velocity onto its divergence-free component
+	// Compute the gradient using central differences
+	u.xy -= 0.5 * float2(q[R] - q[L], q[D] - q[U]) / g_restDensity;
 }
 
 //--------------------------------------------------------------------------------------
@@ -67,7 +82,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	Poisson(g_rwIncompress, b, DTid, cells);
 
 	// Projection
-	Project(g_rwIncompress, u, cells, g_restDensity);
+	Project(g_rwIncompress, u, cells);
 
 	g_rwVelocity[DTid] = u;
 }
