@@ -2,7 +2,7 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
-#define EMISSION_RADIUS (1.0 / 96.0)
+#define EMISSION_RADIUS (1.0 / 64.0)
 
 //--------------------------------------------------------------------------------------
 // Constants
@@ -12,11 +12,11 @@ cbuffer cbPerFrame
 	float g_timeStep;
 };
 
-static const float2 g_emissionPt = { 0.5, 0.96 };
+static const float2 g_emissionPt = { 0.5, 0.9 };
 static const float g_emissionR_sq = EMISSION_RADIUS * EMISSION_RADIUS;
 static const float3 g_emissionForce = float3(0.0, -48.0, 0.0);
-static const float4 g_emissionDye = float4(100.0, 40.0, 0.0, 0.0);
-static const float g_dissipation = 0.8;
+static const float4 g_emissionDye = float4(100.0, 40.0, 0.0, 80.0);
+static const float g_dissipation = 1.0;
 
 //--------------------------------------------------------------------------------------
 // Textures
@@ -58,5 +58,5 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 	// Output
 	g_rwVelocity[DTid] = u;
-	g_rwDye[DTid] = saturate(dye - dye * g_dissipation * g_timeStep);
+	g_rwDye[DTid] = max(dye - dye * g_dissipation * g_timeStep, 0.0);
 }

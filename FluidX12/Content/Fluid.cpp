@@ -34,7 +34,7 @@ bool Fluid::Init(const CommandList& commandList, shared_ptr<DescriptorTableCache
 			ResourceFlag::ALLOW_UNORDERED_ACCESS | ResourceFlag::ALLOW_SIMULTANEOUS_ACCESS,
 			1, MemoryType::DEFAULT, (L"Velocity" + to_wstring(i)).c_str()), false);
 
-		N_RETURN(m_dyes[i].Create(m_device, dim.x, dim.y, dim.z, Format::R8G8B8A8_UNORM,
+		N_RETURN(m_dyes[i].Create(m_device, dim.x, dim.y, dim.z, Format::R16G16B16A16_FLOAT,
 			ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryType::DEFAULT,
 			(L"Dye" + to_wstring(i)).c_str()), false);
 	}
