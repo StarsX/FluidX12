@@ -166,6 +166,9 @@
     <None Include="XUSG\Core\XUSGSampler.inl">
       <Filter>XUSG\Core\Source Files\Inc</Filter>
     </None>
+    <None Include="Content\Shaders\CSProject.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Content\Shaders\VSScreenQuad.hlsl">
@@ -177,10 +180,13 @@
     <FxCompile Include="Content\Shaders\PSRayCast.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Content\Shaders\CSAdvect2D.hlsl">
+    <FxCompile Include="Content\Shaders\CSProject2D.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Content\Shaders\CSProject2D.hlsl">
+    <FxCompile Include="Content\Shaders\CSAdvect.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\CSProject3D.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

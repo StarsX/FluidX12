@@ -103,7 +103,21 @@ void Fluid::Simulate(const CommandList& commandList)
 		// Set descriptor tables
 		commandList.SetComputeDescriptorTable(0, m_srvUavTables[SRV_UAV_TABLE_VECOLITY1]);
 		
-		commandList.Dispatch(DIV_UP(m_gridSize.x, 8), DIV_UP(m_gridSize.y, 8), m_gridSize.z);
+		XMUINT3 numGroups;
+		if (m_gridSize.z > 1) // optimized for 3D
+		{
+			numGroups.x = DIV_UP(m_gridSize.x, 4);
+			numGroups.y = DIV_UP(m_gridSize.y, 4);
+			numGroups.z = DIV_UP(m_gridSize.z, 4);
+		}
+		else
+		{
+			numGroups.x = DIV_UP(m_gridSize.x, 8);
+			numGroups.y = DIV_UP(m_gridSize.y, 8);
+			numGroups.z = m_gridSize.z;
+		}
+
+		commandList.Dispatch(numGroups.x, numGroups.y, numGroups.z);
 	}
 }
 
@@ -181,22 +195,23 @@ bool Fluid::createPipelines(Format rtFormat)
 
 	// Advection
 	{
-		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::CS, csIndex, L"CSAdvect2D.cso"), false);
+		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::CS, csIndex, L"CSAdvect.cso"), false);
 
 		Compute::State state;
 		state.SetPipelineLayout(m_pipelineLayouts[ADVECT]);
 		state.SetShader(m_shaderPool.GetShader(Shader::Stage::CS, csIndex++));
-		X_RETURN(m_pipelines[ADVECT], state.GetPipeline(m_computePipelineCache, L"Advection2D"), false);
+		X_RETURN(m_pipelines[ADVECT], state.GetPipeline(m_computePipelineCache, L"Advection"), false);
 	}
 
 	// Projection
 	{
-		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::CS, csIndex, L"CSProject2D.cso"), false);
+		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::CS, csIndex, m_gridSize.z > 1 ?
+			L"CSProject3D.cso" : L"CSProject2D.cso"), false);
 
 		Compute::State state;
 		state.SetPipelineLayout(m_pipelineLayouts[PROJECT]);
 		state.SetShader(m_shaderPool.GetShader(Shader::Stage::CS, csIndex++));
-		X_RETURN(m_pipelines[PROJECT], state.GetPipeline(m_computePipelineCache, L"Projection2D"), false);
+		X_RETURN(m_pipelines[PROJECT], state.GetPipeline(m_computePipelineCache, L"Projection"), false);
 	}
 
 	// Ray casting
