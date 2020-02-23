@@ -36,8 +36,8 @@ protected:
 	{
 		SRV_UAV_TABLE_VECOLITY,
 		SRV_UAV_TABLE_VECOLITY1,
-		SRV_UAV_TABLE_DYE,
-		SRV_UAV_TABLE_DYE1,
+		SRV_UAV_TABLE_COLOR,
+		SRV_UAV_TABLE_COLOR1,
 
 		NUM_SRV_UAV_TABLE
 	};
@@ -46,7 +46,7 @@ protected:
 	bool createPipelines(XUSG::Format rtFormat);
 	bool createDescriptorTables();
 
-	void visualizeDye(const XUSG::CommandList& commandList);
+	void visualizeColor(const XUSG::CommandList& commandList);
 	void rayCast(const XUSG::CommandList& commandList);
 
 	XUSG::Device m_device;
@@ -66,7 +66,7 @@ protected:
 
 	XUSG::Texture3D			m_incompress;
 	XUSG::Texture3D			m_velocities[2];
-	XUSG::Texture3D			m_dyes[2];
+	XUSG::Texture3D			m_colors[2];
 
 	DirectX::XMUINT3		m_gridSize;
 	DirectX::XMUINT2		m_viewport;
