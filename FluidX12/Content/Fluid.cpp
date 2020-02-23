@@ -31,7 +31,7 @@ Fluid::~Fluid()
 
 bool Fluid::Init(const CommandList& commandList, uint32_t width, uint32_t height,
 	shared_ptr<DescriptorTableCache> descriptorTableCache, vector<Resource>& uploaders,
-	Format rtFormat, const XMUINT3& dim)
+	Format rtFormat, const XMUINT3& dim, uint32_t numParticles)
 {
 	m_descriptorTableCache = descriptorTableCache;
 	m_gridSize = dim;
@@ -56,6 +56,24 @@ bool Fluid::Init(const CommandList& commandList, uint32_t width, uint32_t height
 	ResourceBarrier barrier;
 	const auto numBarriers = m_incompress.SetBarrier(&barrier, ResourceState::UNORDERED_ACCESS);
 	commandList.Barrier(numBarriers, &barrier);
+
+	if (numParticles > 0)
+	{
+		N_RETURN(m_particleBuffer.Create(m_device, numParticles, sizeof(ParticleInfo),
+			ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT, 1, nullptr, 1,
+			nullptr, L"ParticleBuffer"), false);
+
+		vector<ParticleInfo> particles(numParticles);
+		for (auto& particle : particles)
+		{
+			particle = {};
+			particle.Pos.y = FLT_MAX;
+			particle.LifeTime = rand() % numParticles / 10000.0f;
+		}
+		uploaders.emplace_back();
+		m_particleBuffer.Upload(commandList, uploaders.back(), particles.data(),
+			sizeof(ParticleInfo) * numParticles);
+	}
 
 	// Create pipelines
 	N_RETURN(createPipelineLayouts(), false);

@@ -16,7 +16,7 @@ public:
 	bool Init(const XUSG::CommandList& commandList, uint32_t width, uint32_t height,
 		std::shared_ptr<XUSG::DescriptorTableCache> descriptorTableCache,
 		std::vector<XUSG::Resource>& uploaders, XUSG::Format rtFormat,
-		const DirectX::XMUINT3& dim);
+		const DirectX::XMUINT3& dim, uint32_t numParticles = 0);
 
 	void UpdateFrame(float timeStep, DirectX::CXMMATRIX viewProj, const DirectX::XMFLOAT3& eyePt);
 	void Simulate(const XUSG::CommandList& commandList);
@@ -40,6 +40,13 @@ protected:
 		SRV_UAV_TABLE_COLOR1,
 
 		NUM_SRV_UAV_TABLE
+	};
+
+	struct ParticleInfo
+	{
+		DirectX::XMFLOAT3 Pos;
+		DirectX::XMFLOAT3 Velocity;
+		float LifeTime;
 	};
 
 	bool createPipelineLayouts();
@@ -67,6 +74,7 @@ protected:
 	XUSG::Texture3D			m_incompress;
 	XUSG::Texture3D			m_velocities[2];
 	XUSG::Texture3D			m_colors[2];
+	XUSG::StructuredBuffer	m_particleBuffer;
 
 	DirectX::XMUINT3		m_gridSize;
 	DirectX::XMUINT2		m_viewport;

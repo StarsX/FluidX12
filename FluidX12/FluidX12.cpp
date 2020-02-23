@@ -24,7 +24,8 @@ FluidX::FluidX(uint32_t width, uint32_t height, std::wstring name) :
 	m_showFPS(true),
 	m_isPaused(false),
 	m_tracking(false),
-	m_gridSize(128, 128, 128)
+	m_gridSize(128, 128, 128),
+	m_numParticles(0)
 {
 #if defined (_DEBUG)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -144,11 +145,10 @@ void FluidX::LoadAssets()
 
 	vector<Resource> uploaders(0);
 	// Create fast hybrid fluid simulator
-	//const auto numParticles = 1u << 16;
 	m_fluid = make_unique<Fluid>(m_device);
 	if (!m_fluid) ThrowIfFailed(E_FAIL);
 	if (!m_fluid->Init(m_commandList, m_width, m_height, m_descriptorTableCache,
-		uploaders, Format::B8G8R8A8_UNORM, m_gridSize))
+		uploaders, Format::B8G8R8A8_UNORM, m_gridSize, m_numParticles))
 		ThrowIfFailed(E_FAIL);
 
 	// Close the command list and execute it to begin the initial GPU setup.
@@ -319,10 +319,14 @@ void FluidX::ParseCommandLineArgs(wchar_t* argv[], int argc)
 		if (_wcsnicmp(argv[i], L"-gridSize", wcslen(argv[i])) == 0 ||
 			_wcsnicmp(argv[i], L"/gridSize", wcslen(argv[i])) == 0)
 		{
-			m_gridSize.x = i + 1 < argc ? static_cast<uint32_t>(_wtof(argv[i + 1])) : m_gridSize.x;
-			m_gridSize.y = i + 2 < argc ? static_cast<uint32_t>(_wtof(argv[i + 2])) : m_gridSize.y;
-			m_gridSize.z = i + 3 < argc ? static_cast<uint32_t>(_wtof(argv[i + 3])) : m_gridSize.z;
-			break;
+			m_gridSize.x = ++i < argc ? static_cast<uint32_t>(_wtof(argv[i])) : m_gridSize.x;
+			m_gridSize.y = ++i < argc ? static_cast<uint32_t>(_wtof(argv[i])) : m_gridSize.y;
+			m_gridSize.z = ++i < argc ? static_cast<uint32_t>(_wtof(argv[i])) : m_gridSize.z;
+		}
+		else if (_wcsnicmp(argv[i], L"-particles", wcslen(argv[i])) == 0 ||
+			_wcsnicmp(argv[i], L"/particles", wcslen(argv[i])) == 0)
+		{
+			m_numParticles = ++i < argc ? static_cast<uint32_t>(_wtof(argv[i])) : m_numParticles;
 		}
 	}
 }
