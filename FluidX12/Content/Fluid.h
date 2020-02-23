@@ -13,21 +13,21 @@ public:
 	Fluid(const XUSG::Device& device);
 	virtual ~Fluid();
 
-	bool Init(const XUSG::CommandList& commandList,
+	bool Init(const XUSG::CommandList& commandList, uint32_t width, uint32_t height,
 		std::shared_ptr<XUSG::DescriptorTableCache> descriptorTableCache,
 		std::vector<XUSG::Resource>& uploaders, XUSG::Format rtFormat,
 		const DirectX::XMUINT3& dim);
 
-	void UpdateFrame(float timeStep, const DirectX::CXMMATRIX viewProj);
+	void UpdateFrame(float timeStep, DirectX::CXMMATRIX viewProj, const DirectX::XMFLOAT3& eyePt);
 	void Simulate(const XUSG::CommandList& commandList);
-	void Render2D(const XUSG::CommandList& commandList);
+	void Render(const XUSG::CommandList& commandList);
 
 protected:
 	enum PipelineIndex : uint8_t
 	{
 		ADVECT,
 		PROJECT,
-		VISUALIZE_DYE,
+		VISUALIZE,
 
 		NUM_PIPELINE
 	};
@@ -45,6 +45,9 @@ protected:
 	bool createPipelineLayouts();
 	bool createPipelines(XUSG::Format rtFormat);
 	bool createDescriptorTables();
+
+	void visualizeDye(const XUSG::CommandList& commandList);
+	void rayCast(const XUSG::CommandList& commandList);
 
 	XUSG::Device m_device;
 
@@ -66,6 +69,10 @@ protected:
 	XUSG::Texture3D			m_dyes[2];
 
 	DirectX::XMUINT3		m_gridSize;
+	DirectX::XMUINT2		m_viewport;
+	DirectX::XMFLOAT4X4		m_viewProj;
+	DirectX::XMFLOAT3		m_eyePt;
+
 	float					m_timeStep;
 	uint8_t					m_frameParity;
 };

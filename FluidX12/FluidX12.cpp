@@ -20,11 +20,11 @@ const float g_zFar = 1000.0f;
 
 FluidX::FluidX(uint32_t width, uint32_t height, std::wstring name) :
 	DXFramework(width, height, name),
-	m_typedUAV(false),
 	m_frameIndex(0),
 	m_showFPS(true),
 	m_isPaused(false),
-	m_tracking(false)
+	m_tracking(false),
+	m_gridSize(128, 128, 128)
 {
 #if defined (_DEBUG)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -87,22 +87,6 @@ void FluidX::LoadPipeline()
 		m_title += dxgiAdapterDesc.VendorId == 0x1414 && dxgiAdapterDesc.DeviceId == 0x8c ? L" (WARP)" : L" (Software)";
 	ThrowIfFailed(hr);
 
-	D3D12_FEATURE_DATA_D3D12_OPTIONS featureData = {};
-	hr = m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &featureData, sizeof(featureData));
-	if (SUCCEEDED(hr))
-	{
-		// TypedUAVLoadAdditionalFormats contains a Boolean that tells you whether the feature is supported or not
-		if (featureData.TypedUAVLoadAdditionalFormats)
-		{
-			// Can assume “all-or-nothing” subset is supported (e.g. R32G32B32A32_FLOAT)
-			// Cannot assume other formats are supported, so we check:
-			D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport = { DXGI_FORMAT_B8G8R8A8_UNORM, D3D12_FORMAT_SUPPORT1_NONE, D3D12_FORMAT_SUPPORT2_NONE };
-			hr = m_device->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &formatSupport, sizeof(formatSupport));
-			if (SUCCEEDED(hr) && (formatSupport.Support2 & D3D12_FORMAT_SUPPORT2_UAV_TYPED_LOAD))
-				m_typedUAV = true;
-		}
-	}
-
 	// Create the command queue.
 	N_RETURN(m_device->GetCommandQueue(m_commandQueue, CommandListType::DIRECT, CommandQueueFlags::NONE), ThrowIfFailed(E_FAIL));
 
@@ -163,8 +147,8 @@ void FluidX::LoadAssets()
 	//const auto numParticles = 1u << 16;
 	m_fluid = make_unique<Fluid>(m_device);
 	if (!m_fluid) ThrowIfFailed(E_FAIL);
-	if (!m_fluid->Init(m_commandList, m_descriptorTableCache, uploaders,
-		Format::B8G8R8A8_UNORM, XMUINT3(512, 512, 1)))
+	if (!m_fluid->Init(m_commandList, m_width, m_height, m_descriptorTableCache,
+		uploaders, Format::B8G8R8A8_UNORM, m_gridSize))
 		ThrowIfFailed(E_FAIL);
 
 	// Close the command list and execute it to begin the initial GPU setup.
@@ -195,7 +179,7 @@ void FluidX::LoadAssets()
 	XMStoreFloat4x4(&m_proj, proj);
 
 	// View initialization
-	m_focusPt = XMFLOAT3(0.0f, 4.0f, 0.0f);
+	m_focusPt = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	m_eyePt = XMFLOAT3(4.0f, 16.0f, -40.0f);
 	const auto focusPt = XMLoadFloat3(&m_focusPt);
 	const auto eyePt = XMLoadFloat3(&m_eyePt);
@@ -217,11 +201,11 @@ void FluidX::OnUpdate()
 	time = totalTime - pauseTime;
 
 	// View
-	const auto eyePt = XMLoadFloat3(&m_eyePt);
+	//const auto eyePt = XMLoadFloat3(&m_eyePt);
 	const auto view = XMLoadFloat4x4(&m_view);
 	const auto proj = XMLoadFloat4x4(&m_proj);
 	const auto viewProj = view * proj;
-	m_fluid->UpdateFrame(timeStep, viewProj);
+	m_fluid->UpdateFrame(timeStep, viewProj, m_eyePt);
 }
 
 // Render the scene.
@@ -329,6 +313,18 @@ void FluidX::ParseCommandLineArgs(wchar_t* argv[], int argc)
 {
 	wstring_convert<codecvt_utf8<wchar_t>> converter;
 	DXFramework::ParseCommandLineArgs(argv, argc);
+
+	for (auto i = 1; i < argc; ++i)
+	{
+		if (_wcsnicmp(argv[i], L"-gridSize", wcslen(argv[i])) == 0 ||
+			_wcsnicmp(argv[i], L"/gridSize", wcslen(argv[i])) == 0)
+		{
+			m_gridSize.x = i + 1 < argc ? static_cast<uint32_t>(_wtof(argv[i + 1])) : m_gridSize.x;
+			m_gridSize.y = i + 2 < argc ? static_cast<uint32_t>(_wtof(argv[i + 2])) : m_gridSize.y;
+			m_gridSize.z = i + 3 < argc ? static_cast<uint32_t>(_wtof(argv[i + 3])) : m_gridSize.z;
+			break;
+		}
+	}
 }
 
 void FluidX::PopulateCommandList()
@@ -371,7 +367,7 @@ void FluidX::PopulateCommandList()
 	m_commandList.RSSetViewports(1, &viewport);
 	m_commandList.RSSetScissorRects(1, &scissorRect);
 
-	m_fluid->Render2D(m_commandList);
+	m_fluid->Render(m_commandList);
 	
 	// Indicate that the back buffer will now be used to present.
 	numBarriers = m_renderTargets[m_frameIndex].SetBarrier(barriers, ResourceState::PRESENT);

@@ -63,8 +63,6 @@ private:
 	XMFLOAT3	m_focusPt;
 	XMFLOAT3	m_eyePt;
 
-	bool		m_typedUAV;
-
 	// Synchronization objects.
 	uint32_t	m_frameIndex;
 	HANDLE		m_fenceEvent;
@@ -79,6 +77,9 @@ private:
 	// User camera interactions
 	bool m_tracking;
 	XMFLOAT2 m_mousePt;
+
+	// User external settings
+	XMUINT3 m_gridSize;
 
 	void LoadPipeline();
 	void LoadAssets();

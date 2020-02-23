@@ -23,7 +23,8 @@ SamplerState	g_smpLinear;
 
 min16float4 main(PSIn input) : SV_TARGET
 {
-	const float4 color = g_txSrc.SampleLevel(g_smpLinear, float3(input.Tex, 0.5), 0.0);
+	min16float4 color = min16float4(g_txSrc.SampleLevel(g_smpLinear, float3(input.Tex, 0.5), 0.0));
+	color.xyz = sqrt(color.xyz * color.w);
 	
-	return saturate(min16float4(sqrt(color.xyz) * color.w, color.w));
+	return saturate(color);
 }

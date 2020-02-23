@@ -14,7 +14,7 @@ cbuffer cbPerFrame
 
 static const float3 g_emissionPt = { 0.5, 0.93, 0.5 };
 static const float g_emissionR_sq = EMISSION_RADIUS * EMISSION_RADIUS;
-static const float3 g_emissionForce = float3(0.0, -64.0, 0.0);
+static const float3 g_emissionForce = float3(0.0, -80.0, 0.0);
 static const float4 g_emissionDye = float4(100.0, 40.0, 0.0, 64.0);
 static const float g_dissipation = 0.1;
 

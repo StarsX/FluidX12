@@ -8,6 +8,14 @@ using namespace std;
 using namespace DirectX;
 using namespace XUSG;
 
+struct CBPerObject
+{
+	XMVECTOR LocalSpaceLightPt;
+	XMVECTOR LocalSpaceEyePt;
+	XMMATRIX ScreenToLocal;
+	XMMATRIX WorldViewProj;
+};
+
 Fluid::Fluid(const Device& device) :
 	m_device(device),
 	m_frameParity(0)
@@ -21,11 +29,13 @@ Fluid::~Fluid()
 {
 }
 
-bool Fluid::Init(const CommandList& commandList, shared_ptr<DescriptorTableCache> descriptorTableCache,
-	vector<Resource>& uploaders, Format rtFormat, const XMUINT3& dim)
+bool Fluid::Init(const CommandList& commandList, uint32_t width, uint32_t height,
+	shared_ptr<DescriptorTableCache> descriptorTableCache, vector<Resource>& uploaders,
+	Format rtFormat, const XMUINT3& dim)
 {
 	m_descriptorTableCache = descriptorTableCache;
 	m_gridSize = dim;
+	m_viewport = XMUINT2(width, height);
 
 	// Create resources
 	for (auto i = 0ui8; i < 2; ++i)
@@ -55,11 +65,12 @@ bool Fluid::Init(const CommandList& commandList, shared_ptr<DescriptorTableCache
 	return true;
 }
 
-void Fluid::UpdateFrame(float timeStep, const CXMMATRIX viewProj)
+void Fluid::UpdateFrame(float timeStep, CXMMATRIX viewProj, const XMFLOAT3& eyePt)
 {
 	m_timeStep = timeStep;
 	m_frameParity = !m_frameParity;
-	//XMStoreFloat4x4(&m_viewProj, XMMatrixTranspose(viewProj));
+	XMStoreFloat4x4(&m_viewProj, XMMatrixTranspose(viewProj));
+	m_eyePt = eyePt;
 }
 
 void Fluid::Simulate(const CommandList& commandList)
@@ -121,19 +132,10 @@ void Fluid::Simulate(const CommandList& commandList)
 	}
 }
 
-void Fluid::Render2D(const CommandList& commandList)
+void Fluid::Render(const CommandList& commandList)
 {
-	// Set pipeline state
-	commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[VISUALIZE_DYE]);
-	commandList.SetPipelineState(m_pipelines[VISUALIZE_DYE]);
-
-	commandList.IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);
-
-	// Set descriptor tables
-	commandList.SetGraphicsDescriptorTable(0, m_srvUavTables[SRV_UAV_TABLE_DYE + !m_frameParity]);
-	commandList.SetGraphicsDescriptorTable(1, m_samplerTable);
-
-	commandList.Draw(3, 1, 0, 0);
+	if (m_gridSize.z > 1) rayCast(commandList);
+	else visualizeDye(commandList);
 }
 
 bool Fluid::createPipelineLayouts()
@@ -160,19 +162,9 @@ bool Fluid::createPipelineLayouts()
 			PipelineLayoutFlag::NONE, L"ProjectionLayout"), false);
 	}
 
-	// Visualize dye
+	if (m_gridSize.z > 1)
 	{
-		Util::PipelineLayout pipelineLayout;
-		pipelineLayout.SetRange(0, DescriptorType::SRV, 1, 0);
-		pipelineLayout.SetRange(1, DescriptorType::SAMPLER, 1, 0);
-		pipelineLayout.SetShaderStage(0, Shader::PS);
-		pipelineLayout.SetShaderStage(1, Shader::PS);
-		X_RETURN(m_pipelineLayouts[VISUALIZE_DYE], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
-			PipelineLayoutFlag::NONE, L"DyeVisualizationLayout"), false);
-	}
-
-	// Ray casting
-	/*{
+		// Ray casting
 		Util::PipelineLayout pipelineLayout;
 		pipelineLayout.SetConstants(0, SizeOfInUint32(CBPerObject), 0, 0, Shader::Stage::PS);
 		pipelineLayout.SetRange(1, DescriptorType::SRV, 1, 0);
@@ -180,9 +172,20 @@ bool Fluid::createPipelineLayouts()
 		pipelineLayout.SetShaderStage(0, Shader::Stage::PS);
 		pipelineLayout.SetShaderStage(1, Shader::Stage::PS);
 		pipelineLayout.SetShaderStage(2, Shader::Stage::PS);
-		X_RETURN(m_pipelineLayouts[RAY_CAST], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
-			PipelineLayoutFlag::NONE, L"RayCastLayout"), false);
-	}*/
+		X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
+			PipelineLayoutFlag::NONE, L"RayCastingLayout"), false);
+	}
+	else
+	{
+		// Dye visualization
+		Util::PipelineLayout pipelineLayout;
+		pipelineLayout.SetRange(0, DescriptorType::SRV, 1, 0);
+		pipelineLayout.SetRange(1, DescriptorType::SAMPLER, 1, 0);
+		pipelineLayout.SetShaderStage(0, Shader::PS);
+		pipelineLayout.SetShaderStage(1, Shader::PS);
+		X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
+			PipelineLayoutFlag::NONE, L"DyeVisualizationLayout"), false);
+	}
 
 	return true;
 }
@@ -214,35 +217,37 @@ bool Fluid::createPipelines(Format rtFormat)
 		X_RETURN(m_pipelines[PROJECT], state.GetPipeline(m_computePipelineCache, L"Projection"), false);
 	}
 
-	// Ray casting
+	// Visualization
 	N_RETURN(m_shaderPool.CreateShader(Shader::Stage::VS, vsIndex, L"VSScreenQuad.cso"), false);
+	if (m_gridSize.z > 1)
 	{
+		// Ray casting
+		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::PS, psIndex, L"PSRayCast.cso"), false);
+
+		Graphics::State state;
+		state.SetPipelineLayout(m_pipelineLayouts[VISUALIZE]);
+		state.SetShader(Shader::Stage::VS, m_shaderPool.GetShader(Shader::Stage::VS, vsIndex++));
+		state.SetShader(Shader::Stage::PS, m_shaderPool.GetShader(Shader::Stage::PS, psIndex));
+		state.IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
+		state.DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache);
+		state.OMSetBlendState(Graphics::NON_PRE_MUL, m_graphicsPipelineCache);
+		state.OMSetRTVFormats(&rtFormat, 1);
+		X_RETURN(m_pipelines[VISUALIZE], state.GetPipeline(m_graphicsPipelineCache, L"RayCasting"), false);
+	}
+	else
+	{
+		// Dye visualization
 		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::PS, psIndex, L"PSVisualizeDye.cso"), false);
 
 		Graphics::State state;
-		state.SetPipelineLayout(m_pipelineLayouts[VISUALIZE_DYE]);
+		state.SetPipelineLayout(m_pipelineLayouts[VISUALIZE]);
 		state.SetShader(Shader::Stage::VS, m_shaderPool.GetShader(Shader::Stage::VS, vsIndex));
 		state.SetShader(Shader::Stage::PS, m_shaderPool.GetShader(Shader::Stage::PS, psIndex++));
 		state.IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
 		state.DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache);
 		state.OMSetRTVFormats(&rtFormat, 1);
-		X_RETURN(m_pipelines[VISUALIZE_DYE], state.GetPipeline(m_graphicsPipelineCache, L"DyeVisualization"), false);
+		X_RETURN(m_pipelines[VISUALIZE], state.GetPipeline(m_graphicsPipelineCache, L"DyeVisualization"), false);
 	}
-
-	// Ray casting
-	/*{
-		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::PS, 0, L"PSRayCast.cso"), false);
-
-		Graphics::State state;
-		state.SetPipelineLayout(m_pipelineLayouts[RAY_CAST]);
-		state.SetShader(Shader::Stage::VS, m_shaderPool.GetShader(Shader::Stage::VS, 0));
-		state.SetShader(Shader::Stage::PS, m_shaderPool.GetShader(Shader::Stage::PS, 0));
-		state.IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
-		state.DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache);
-		state.OMSetBlendState(Graphics::NON_PRE_MUL, m_graphicsPipelineCache);
-		state.OMSetRTVFormats(&rtFormat, 1);
-		X_RETURN(m_pipelines[RAY_CAST], state.GetPipeline(m_graphicsPipelineCache, L"RayCast"), false);
-	}*/
 
 	return true;
 }
@@ -291,4 +296,57 @@ bool Fluid::createDescriptorTables()
 	}
 
 	return true;
+}
+
+void Fluid::visualizeDye(const CommandList& commandList)
+{
+	// Set pipeline state
+	commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[VISUALIZE]);
+	commandList.SetPipelineState(m_pipelines[VISUALIZE]);
+
+	commandList.IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);
+
+	// Set descriptor tables
+	commandList.SetGraphicsDescriptorTable(0, m_srvUavTables[SRV_UAV_TABLE_DYE + !m_frameParity]);
+	commandList.SetGraphicsDescriptorTable(1, m_samplerTable);
+
+	commandList.Draw(3, 1, 0, 0);
+}
+
+void Fluid::rayCast(const CommandList& commandList)
+{
+	// General matrices
+	const auto world = XMMatrixScaling(8.0f, 8.0f, 8.0f);
+	const auto worldI = XMMatrixInverse(nullptr, world);
+	const auto worldViewProj = world * XMMatrixTranspose(XMLoadFloat4x4(&m_viewProj));
+
+	// Screen space matrices
+	CBPerObject cbPerObject;
+	cbPerObject.LocalSpaceLightPt = XMVector3TransformCoord(XMVectorSet(75.0f, 75.0f, -75.0f, 0.0f), worldI);
+	cbPerObject.LocalSpaceEyePt = XMVector3TransformCoord(XMLoadFloat3(&m_eyePt), worldI);
+
+	const auto mToScreen = XMMATRIX
+	(
+		0.5f * m_viewport.x, 0.0f, 0.0f, 0.0f,
+		0.0f, -0.5f * m_viewport.y, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.5f * m_viewport.x, 0.5f * m_viewport.y, 0.0f, 1.0f
+	);
+	const auto localToScreen = XMMatrixMultiply(worldViewProj, mToScreen);
+	const auto screenToLocal = XMMatrixInverse(nullptr, localToScreen);
+	cbPerObject.ScreenToLocal = XMMatrixTranspose(screenToLocal);
+	cbPerObject.WorldViewProj = XMMatrixTranspose(worldViewProj);
+
+	// Set pipeline state
+	commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[VISUALIZE]);
+	commandList.SetPipelineState(m_pipelines[VISUALIZE]);
+
+	commandList.IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);
+
+	// Set descriptor tables
+	commandList.SetGraphics32BitConstants(0, SizeOfInUint32(cbPerObject), &cbPerObject);
+	commandList.SetGraphicsDescriptorTable(1, m_srvUavTables[SRV_UAV_TABLE_DYE + !m_frameParity]);
+	commandList.SetGraphicsDescriptorTable(2, m_samplerTable);
+
+	commandList.Draw(3, 1, 0, 0);
 }

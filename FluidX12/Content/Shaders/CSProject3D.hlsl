@@ -10,11 +10,11 @@
 #define B 5
 #define N 6
 
-#define ITER 24
+#define ITER 16
 
 #include "CSPoisson.hlsli"
 
-static const float g_restDensity = 0.8;
+static const float g_restDensity = 0.4;
 
 //--------------------------------------------------------------------------------------
 // Textures

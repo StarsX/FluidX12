@@ -13,13 +13,6 @@
 //--------------------------------------------------------------------------------------
 // Constant buffers
 //--------------------------------------------------------------------------------------
-/*cbuffer cbImmutable
-{
-	float4  g_vViewport;
-	float4  g_vDirectional;
-	float4  g_vAmbient;
-};*/
-
 cbuffer cbPerObject
 {
 	float3	g_localSpaceLightPt;
@@ -27,9 +20,6 @@ cbuffer cbPerObject
 	matrix	g_screenToLocal;
 	matrix	g_worldViewProj;
 };
-
-//static const float3 g_vLightRad = g_vDirectional.xyz * g_vDirectional.w;	// 4.0
-//static const float3 g_vAmbientRad = g_vAmbient.xyz * g_vAmbient.w;			// 1.0
 
 static const min16float g_maxDist = 2.0 * sqrt(3.0);
 static const min16float g_stepScale = g_maxDist / NUM_SAMPLES;
@@ -40,7 +30,7 @@ static const min16float3 g_clearColor = 0.0;
 //--------------------------------------------------------------------------------------
 // Textures
 //--------------------------------------------------------------------------------------
-Texture3D<float>	g_txGrid;
+Texture3D<float4>	g_txGrid;
 
 //--------------------------------------------------------------------------------------
 // Unordered access textures
@@ -97,11 +87,12 @@ bool ComputeStartPoint(inout float3 pos, float3 rayDir)
 //--------------------------------------------------------------------------------------
 // Sample density field
 //--------------------------------------------------------------------------------------
-min16float GetSample(float3 tex, float level)
+min16float4 GetSample(float3 tex, float level)
 {
-	const min16float density = min16float(g_txGrid.SampleLevel(g_smpLinear, tex, 0.0));
+	min16float4 color = min16float4(g_txGrid.SampleLevel(g_smpLinear, tex, 0.0));
+	color.w *= 24.0;
 
-	return density / 48.0;
+	return min16float4(color.xyz * color.w, color.w);
 }
 
 float CalculateLevelOfDetail(float3 step)
@@ -138,7 +129,7 @@ min16float4 main(float4 sspos : SV_POSITION) : SV_TARGET
 	// Transmittance
 	min16float transmit = 1.0;
 	// In-scattered radiance
-	min16float scatter = 0.0;
+	min16float3 scatter = 0.0;
 
 	for (uint i = 0; i < NUM_SAMPLES; ++i)
 	{
@@ -146,14 +137,14 @@ min16float4 main(float4 sspos : SV_POSITION) : SV_TARGET
 		float3 tex = float3(0.5, -0.5, 0.5) * pos + 0.5;
 
 		// Get a sample
-		const min16float density = GetSample(tex, level);
+		const min16float4 color = GetSample(tex, level);
 
 		// Skip empty space
-		if (density > ZERO_THRESHOLD)
+		if (color.w > ZERO_THRESHOLD)
 		{
 			// Attenuate ray-throughput
-			const min16float scaledDens = density * g_stepScale;
-			transmit *= saturate(1.0 - scaledDens * ABSORPTION);
+			const min16float4 scaledColor = color * g_stepScale;
+			transmit *= saturate(1.0 - scaledColor.w * ABSORPTION);
 			if (transmit < ZERO_THRESHOLD) break;
 
 			// Point light direction in texture space
@@ -171,17 +162,17 @@ min16float4 main(float4 sspos : SV_POSITION) : SV_TARGET
 				tex = min16float3(0.5, -0.5, 0.5) * lightPos + 0.5;
 
 				// Get a sample along light ray
-				const min16float lightDens = GetSample(tex, lightLevel);
+				const min16float density = GetSample(tex, lightLevel).x;
 
 				// Attenuate ray-throughput along light direction
-				lightTrans *= saturate(1.0 - ABSORPTION * g_lightStepScale * lightDens);
+				lightTrans *= saturate(1.0 - ABSORPTION * g_lightStepScale * density);
 				if (lightTrans < ZERO_THRESHOLD) break;
 
 				// Update position along light ray
 				lightPos += lightStep;
 			}
 
-			scatter += lightTrans * transmit * scaledDens;
+			scatter += lightTrans * transmit * scaledColor.xyz;
 		}
 
 		pos += step;
@@ -189,9 +180,8 @@ min16float4 main(float4 sspos : SV_POSITION) : SV_TARGET
 
 	//clip(ONE_THRESHOLD - transmit);
 
-	min16float3 result = scatter * 0.8 + 0.2;
+	min16float3 result = scatter + 0.16;
 	//result = lerp(result, g_clearColor * g_clearColor, transmit);
-	result *= min16float3(0.2, 0.4, 1.0);
 
-	return min16float4(sqrt(result), 1.0 - transmit);
+	return min16float4(sqrt(result), saturate(1.0 - transmit));
 }

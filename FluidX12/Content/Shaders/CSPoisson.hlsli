@@ -7,9 +7,9 @@
 //--------------------------------------------------------------------------------------
 void Poisson(RWTexture3D<float> rwX, float b, uint3 cell, uint3 cells[N])
 {
+	// Jacobi/Gauss-Seidel iterations
 	for (uint k = 0; k < ITER; ++k)
 	{
-		// Jacobi/Gauss-Seidel iterations
 		float q[N];
 		[unroll] for (uint i = 0; i < N; ++i) q[i] = rwX[cells[i]];
 		const float x0 = rwX[cell];
