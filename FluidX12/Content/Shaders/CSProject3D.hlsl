@@ -10,11 +10,11 @@
 #define B 5
 #define N 6
 
-#define ITER 16
+#define ITER 64
 
 #include "CSPoisson.hlsli"
 
-static const float g_restDensity = 0.4;
+static const float g_density = 0.4;
 
 //--------------------------------------------------------------------------------------
 // Textures
@@ -50,7 +50,7 @@ void Project(RWTexture3D<float> rwQ, inout float3 u, uint3 cells[N])
 
 	// Project the velocity onto its divergence-free component
 	// Compute the gradient using central differences
-	u -= 0.5 * float3(q[R] - q[L], q[D] - q[U], q[B] - q[F]) / g_restDensity;
+	u -= 0.5 * float3(q[R] - q[L], q[D] - q[U], q[B] - q[F]) / g_density;
 }
 
 //--------------------------------------------------------------------------------------
