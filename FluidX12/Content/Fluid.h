@@ -41,6 +41,14 @@ protected:
 
 		NUM_SRV_UAV_TABLE
 	};
+	
+	enum SamplerTable : uint8_t
+	{
+		SAMPLER_TABLE_MIRROR,
+		SAMPLER_TABLE_CLAMP,
+		
+		NUM_SAMPLER_TABLE
+	};
 
 	struct ParticleInfo
 	{
@@ -52,9 +60,11 @@ protected:
 	bool createPipelineLayouts();
 	bool createPipelines(XUSG::Format rtFormat);
 	bool createDescriptorTables();
+	bool needColorField() const;
 
 	void visualizeColor(const XUSG::CommandList& commandList);
 	void rayCast(const XUSG::CommandList& commandList);
+	void particle2D(const XUSG::CommandList& commandList);
 
 	XUSG::Device m_device;
 
@@ -69,7 +79,7 @@ protected:
 
 	XUSG::DescriptorTable	m_srvUavTables[NUM_SRV_UAV_TABLE];
 	XUSG::DescriptorTable	m_uavTable;	// Incompressibility
-	XUSG::DescriptorTable	m_samplerTable;
+	XUSG::DescriptorTable	m_samplerTables[NUM_SAMPLER_TABLE];
 
 	XUSG::Texture3D			m_incompress;
 	XUSG::Texture3D			m_velocities[2];
@@ -83,4 +93,5 @@ protected:
 
 	float					m_timeStep;
 	uint8_t					m_frameParity;
+	uint32_t				m_numParticles;
 };

@@ -40,6 +40,15 @@
     <Filter Include="XUSG\Core\Header Files">
       <UniqueIdentifier>{6a7b3215-b154-4774-a7f3-e64791563094}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Simulation">
+      <UniqueIdentifier>{714fc0ee-cb60-45fa-b4d4-0dd1b1e9c86d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Particle">
+      <UniqueIdentifier>{f6c6cd02-7fa6-4038-bfa3-c212c3bea5bc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Rendering">
+      <UniqueIdentifier>{d5948538-5a6c-4355-be97-873963b1f36a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Common\d3dx12.h">
@@ -167,30 +176,39 @@
       <Filter>XUSG\Core\Source Files\Inc</Filter>
     </None>
     <None Include="Content\Shaders\CSPoisson.hlsli">
-      <Filter>Shaders</Filter>
+      <Filter>Shaders\Simulation</Filter>
+    </None>
+    <None Include="Content\Shaders\Impulse.hlsli">
+      <Filter>Shaders\Simulation</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Content\Shaders\VSScreenQuad.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Content\Shaders\PSRayCast.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Content\Shaders\CSProject2D.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
     <FxCompile Include="Content\Shaders\CSAdvect.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Content\Shaders\CSProject3D.hlsl">
-      <Filter>Shaders</Filter>
+      <Filter>Shaders\Simulation</Filter>
     </FxCompile>
     <FxCompile Include="Content\Shaders\CSAdvectVelocity.hlsl">
-      <Filter>Shaders</Filter>
+      <Filter>Shaders\Simulation</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\CSProject2D.hlsl">
+      <Filter>Shaders\Simulation</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\CSProject3D.hlsl">
+      <Filter>Shaders\Simulation</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\VSParticle2D.hlsl">
+      <Filter>Shaders\Particle</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\PSRayCast.hlsl">
+      <Filter>Shaders\Rendering</Filter>
     </FxCompile>
     <FxCompile Include="Content\Shaders\PSVisualizeColor.hlsl">
-      <Filter>Shaders</Filter>
+      <Filter>Shaders\Rendering</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\VSScreenQuad.hlsl">
+      <Filter>Shaders\Rendering</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\PSConstColor.hlsl">
+      <Filter>Shaders\Rendering</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>

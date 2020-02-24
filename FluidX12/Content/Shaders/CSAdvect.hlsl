@@ -2,21 +2,13 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
-#define IMPULSE_RADIUS (1.0 / 56.0)
+#include "Impulse.hlsli"
 
 //--------------------------------------------------------------------------------------
 // Constants
 //--------------------------------------------------------------------------------------
-cbuffer cbPerFrame
-{
-	float g_timeStep;
-};
-
-static const float3	g_impulsePos = { 0.5, 0.93, 0.5 };
-static const float	g_impulseR_sq = IMPULSE_RADIUS * IMPULSE_RADIUS;
 static const float3	g_extforce = float3(0.0, -80.0, 0.0);
 #if ADVECT_COLOR
-static const float4	g_impulse = float4(100.0, 40.0, 0.0, 64.0);
 static const float	g_dissipation = 0.1;
 #endif
 
@@ -37,35 +29,45 @@ Texture3D			g_txColor;
 SamplerState g_smpLinear;
 
 //--------------------------------------------------------------------------------------
+// Gaussian function
+//--------------------------------------------------------------------------------------
+float Gaussian(float3 disp, float r)
+{
+	return exp(-dot(disp, disp) / (r * r));
+}
+
+//--------------------------------------------------------------------------------------
 // Compute shader of advection
 //--------------------------------------------------------------------------------------
 [numthreads(8, 8, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
+	const float timeStep = g_timeStep;
+
 	// Fetch velocity field
 	float3 dim;
 	g_txVelocity.GetDimensions(dim.x, dim.y, dim.z);
-	float3 u = g_txVelocity[DTid];
+	const float3 u = g_txVelocity[DTid];
 
 	// Advections
-	float3 pos = (DTid + 0.5) / dim;
-	const float3 adv = pos - u * g_timeStep;
-	u = g_txVelocity.SampleLevel(g_smpLinear, adv, 0.0);
+	const float3 texel = 1.0 / dim;
+	const float3 pos = (DTid + 0.5) * texel;
+	const float3 adv = pos - u * timeStep;
+	float3 w = g_txVelocity.SampleLevel(g_smpLinear, adv, 0.0);
 #if ADVECT_COLOR
 	float4 color = g_txColor.SampleLevel(g_smpLinear, adv, 0.0);
 #endif
 
 	// Impulse
-	const float3 disp = pos - g_impulsePos;
-	const float basis = exp(-dot(disp, disp) / g_impulseR_sq);
-	u += g_extforce * g_timeStep * basis;
+	const float basis = Gaussian(pos - g_impulsePos, g_impulseR);
+	w += g_extforce * timeStep * basis;
 #if ADVECT_COLOR
-	color += g_impulse * g_timeStep * basis;
+	color += g_impulse * timeStep * basis;
 #endif
 
 	// Output
-	g_rwVelocity[DTid] = u;
+	g_rwVelocity[DTid] = w;
 #if ADVECT_COLOR
-	g_rwColor[DTid] = max(color - color * g_dissipation * g_timeStep, 0.0);
+	g_rwColor[DTid] = max(color - color * g_dissipation * timeStep, 0.0);
 #endif
 }
