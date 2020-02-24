@@ -79,9 +79,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 	// Boundary process
 	int3 offset;
-	offset.x = DTid.x + 1 >= dim.x ? -1 : (DTid.x <= 1 ? 1 : 0);
-	offset.y = DTid.y + 1 >= dim.y ? -1 : (DTid.y <= 1 ? 1 : 0);
-	offset.z = DTid.z + 1 >= dim.z ? -1 : (DTid.z <= 1 ? 1 : 0);
+	offset.x = DTid.x + 1 >= dim.x ? -1 : (DTid.x < 1 ? 1 : 0);
+	offset.y = DTid.y + 1 >= dim.y ? -1 : (DTid.y < 1 ? 1 : 0);
+	offset.z = DTid.z + 1 >= dim.z ? -1 : (DTid.z < 1 ? 1 : 0);
 	if (any(offset)) u = -g_txVelocity[DTid + offset];
 
 	// Poisson solver

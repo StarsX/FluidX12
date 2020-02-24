@@ -7,10 +7,10 @@
 //--------------------------------------------------------------------------------------
 // Constants
 //--------------------------------------------------------------------------------------
-static const float3	g_extforce = float3(0.0, -80.0, 0.0);
-#if ADVECT_COLOR
+static const float3	g_extForce = float3(0.0, -48.0, 0.0);
+static const float	g_forceScl3D = 4.0;
+static const float	g_vortScl = 200.0;
 static const float	g_dissipation = 0.1;
-#endif
 
 //--------------------------------------------------------------------------------------
 // Textures
@@ -33,7 +33,7 @@ SamplerState g_smpLinear;
 //--------------------------------------------------------------------------------------
 float Gaussian(float3 disp, float r)
 {
-	return exp(-dot(disp, disp) / (r * r));
+	return exp(-4.0 * dot(disp, disp) / (r * r));
 }
 
 //--------------------------------------------------------------------------------------
@@ -59,15 +59,22 @@ void main(uint3 DTid : SV_DispatchThreadID)
 #endif
 
 	// Impulse
-	const float basis = Gaussian(pos - g_impulsePos, g_impulseR);
-	w += g_extforce * timeStep * basis;
+	const float3 disp = pos - g_impulsePos;
+	const float basis = Gaussian(disp, g_impulseR);
+	if (basis >= exp(-4.0))
+	{
+		const float3 vortForce = float3(-disp.z, 0.0, disp.x) * g_vortScl;
+		float3 extForce = g_extForce * basis;
+		extForce = dim.z > 1 ? extForce * g_forceScl3D + vortForce : extForce;
+		w += extForce * timeStep;
 #if ADVECT_COLOR
-	color += g_impulse * timeStep * basis;
+		color += g_impulse * timeStep * basis;
 #endif
+	}
 
 	// Output
 	g_rwVelocity[DTid] = w;
 #if ADVECT_COLOR
-	g_rwColor[DTid] = max(color - color * g_dissipation * timeStep, 0.0);
+	g_rwColor[DTid] = color * max(1.0 - g_dissipation * timeStep, 0.0);
 #endif
 }

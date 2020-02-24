@@ -87,23 +87,12 @@ bool ComputeStartPoint(inout float3 pos, float3 rayDir)
 //--------------------------------------------------------------------------------------
 // Sample density field
 //--------------------------------------------------------------------------------------
-min16float4 GetSample(float3 tex, float level)
+min16float4 GetSample(float3 tex)
 {
 	min16float4 color = min16float4(g_txGrid.SampleLevel(g_smpLinear, tex, 0.0));
 	color.w *= 24.0;
 
-	return min16float4(color.xyz * color.w, color.w);
-}
-
-float CalculateLevelOfDetail(float3 step)
-{
-	float3 dim;
-	g_txGrid.GetDimensions(dim.x, dim.y, dim.z);
-
-	const float3 m = abs(step * dim);
-	const float rho = max(max(m.x, m.y), m.z);
-	
-	return log(rho);
+	return min(min16float4(color.xyz * color.w, color.w), 24.0);
 }
 
 //--------------------------------------------------------------------------------------
@@ -115,15 +104,10 @@ min16float4 main(float4 sspos : SV_POSITION) : SV_TARGET
 	const float3 rayDir = normalize(pos - g_localSpaceEyePt);
 	if (!ComputeStartPoint(pos, rayDir)) discard;
 
-	//float4 svpos = mul(float4(pos, 1.0), g_worldViewProj);
-
 	const float3 step = rayDir * g_stepScale;
-
-	const float level = CalculateLevelOfDetail(step * 0.5);
 
 #ifndef _POINT_LIGHT_
 	const float3 lightStep = normalize(g_localSpaceLightPt) * g_lightStepScale;
-	const float lightLevel = CalculateLevelOfDetail(lightStep * 0.5);
 #endif
 
 	// Transmittance
@@ -137,7 +121,7 @@ min16float4 main(float4 sspos : SV_POSITION) : SV_TARGET
 		float3 tex = float3(0.5, -0.5, 0.5) * pos + 0.5;
 
 		// Get a sample
-		const min16float4 color = GetSample(tex, level);
+		const min16float4 color = GetSample(tex);
 
 		// Skip empty space
 		if (color.w > ZERO_THRESHOLD)
@@ -162,7 +146,7 @@ min16float4 main(float4 sspos : SV_POSITION) : SV_TARGET
 				tex = min16float3(0.5, -0.5, 0.5) * lightPos + 0.5;
 
 				// Get a sample along light ray
-				const min16float density = GetSample(tex, lightLevel).x;
+				const min16float density = GetSample(tex).x;
 
 				// Attenuate ray-throughput along light direction
 				lightTrans *= saturate(1.0 - ABSORPTION * g_lightStepScale * density);

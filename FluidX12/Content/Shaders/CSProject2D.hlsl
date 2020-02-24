@@ -71,10 +71,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	const float b = GetDivergence(g_txVelocity, cells);
 	float3 u = g_txVelocity[DTid];
 
-	// Boundary process
 	int3 offset;
-	offset.x = DTid.x + 1 >= dim.x ? -1 : (DTid.x <= 1 ? 1 : 0);
-	offset.y = DTid.y + 1 >= dim.y ? -1 : (DTid.y <= 1 ? 1 : 0);
+	offset.x = DTid.x + 1 >= dim.x ? -1 : (DTid.x < 1 ? 1 : 0);
+	offset.y = DTid.y + 1 >= dim.y ? -1 : (DTid.y < 1 ? 1 : 0);
 	offset.z = 0;
 	if (any(offset.xy)) u = -g_txVelocity[DTid + offset];
 
