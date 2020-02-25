@@ -71,7 +71,7 @@ void Emit(uint particleId, inout Particle particle, bool is3D)
 {
 	// Load emitter with a random index
 	uint2 seed = { particleId, g_baseSeed };
-	const float r = g_impulseR * rand(seed, 1000) / 1000.0f;
+	const float r = g_impulseR * rand(seed, 1000) / 1000.0;
 	const float t = rand(seed, 1000) / 1000.0;
 	const float theta = t * 2.0 * PI;
 	float3 sphere;
@@ -89,7 +89,7 @@ void Emit(uint particleId, inout Particle particle, bool is3D)
 
 	// Particle emission
 	particle.Pos = g_impulsePos + sphere;
-	particle.LifeTime = g_fullLife + rand(seed, 1000) / 1000.0f;
+	particle.LifeTime = g_fullLife + rand(seed, 1000) / 1000.0;
 }
 
 //--------------------------------------------------------------------------------------
@@ -110,6 +110,18 @@ void UpdateParticle(uint particleId, inout Particle particle, bool is3D)
 }
 
 //--------------------------------------------------------------------------------------
+// Simulation space to object space
+//--------------------------------------------------------------------------------------
+float3 SimulationToObjectSpace(float3 pos, bool is3D)
+{
+	pos = pos * 2.0 - 1.0;
+	pos.y = -pos.y;
+	pos.z = is3D ? pos.z : 0.0;
+
+	return pos;
+}
+
+//--------------------------------------------------------------------------------------
 // Vertex shader of particle integration or emission
 //--------------------------------------------------------------------------------------
 float4 main(uint ParticleId : SV_VERTEXID) : SV_POSITION
@@ -117,15 +129,16 @@ float4 main(uint ParticleId : SV_VERTEXID) : SV_POSITION
 	// Load particle
 	Particle particle = g_rwParticles[ParticleId];
 
-	// Update particle
-	uint3 dim;
-	g_txVelocity.GetDimensions(dim.x, dim.y, dim.z);
-	UpdateParticle(ParticleId, particle, dim.z > 1);
+	// Get grid size
+	uint3 gridSize;
+	g_txVelocity.GetDimensions(gridSize.x, gridSize.y, gridSize.z);
 
-	// Calculate world position
-	float3 pos = particle.Pos * 2.0 - 1.0;
-	pos.y = -pos.y;
-	pos.z = dim.z > 1 ? pos.z : 0.0;
+	// Update particle
+	const bool is3D = gridSize.z > 1;
+	UpdateParticle(ParticleId, particle, is3D);
+
+	// Calculate object position
+	const float3 pos = SimulationToObjectSpace(particle.Pos, is3D);
 
 	return mul(float4(pos, 1.0), g_worldViewProj);
 }

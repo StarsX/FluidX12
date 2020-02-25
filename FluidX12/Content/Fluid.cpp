@@ -31,28 +31,28 @@ Fluid::~Fluid()
 
 bool Fluid::Init(const CommandList& commandList, uint32_t width, uint32_t height,
 	shared_ptr<DescriptorTableCache> descriptorTableCache, vector<Resource>& uploaders,
-	Format rtFormat, const XMUINT3& dim, uint32_t numParticles)
+	Format rtFormat, const XMUINT3& gridSize, uint32_t numParticles)
 {
 	m_viewport = XMUINT2(width, height);
 	m_descriptorTableCache = descriptorTableCache;
-	m_gridSize = dim;
+	m_gridSize = gridSize;
 	m_numParticles = numParticles;
 
 	// Create resources
 	for (auto i = 0ui8; i < 2; ++i)
 	{
-		N_RETURN(m_velocities[i].Create(m_device, dim.x, dim.y, dim.z, Format::R16G16B16A16_FLOAT,
+		N_RETURN(m_velocities[i].Create(m_device, gridSize.x, gridSize.y, gridSize.z, Format::R16G16B16A16_FLOAT,
 			i ? ResourceFlag::ALLOW_UNORDERED_ACCESS : (ResourceFlag::ALLOW_UNORDERED_ACCESS |
 				ResourceFlag::ALLOW_SIMULTANEOUS_ACCESS), 1, MemoryType::DEFAULT,
 				(L"Velocity" + to_wstring(i)).c_str()), false);
 
 		if (needColorField())
-			N_RETURN(m_colors[i].Create(m_device, dim.x, dim.y, dim.z, Format::R16G16B16A16_FLOAT,
+			N_RETURN(m_colors[i].Create(m_device, gridSize.x, gridSize.y, gridSize.z, Format::R16G16B16A16_FLOAT,
 				ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryType::DEFAULT,
 				(L"Color" + to_wstring(i)).c_str()), false);
 	}
 
-	N_RETURN(m_incompress.Create(m_device, dim.x, dim.y, dim.z, Format::R32_FLOAT,
+	N_RETURN(m_incompress.Create(m_device, gridSize.x, gridSize.y, gridSize.z, Format::R32_FLOAT,
 		ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryType::DEFAULT,
 		L"Incompressibility"), false);
 

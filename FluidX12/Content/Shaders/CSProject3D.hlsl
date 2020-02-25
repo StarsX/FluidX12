@@ -59,13 +59,13 @@ void Project(RWTexture3D<float> rwQ, inout float3 u, uint3 cells[N])
 [numthreads(4, 4, 4)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
-	uint3 dim;
-	g_txVelocity.GetDimensions(dim.x, dim.y, dim.z);
+	uint3 gridSize;
+	g_txVelocity.GetDimensions(gridSize.x, gridSize.y, gridSize.z);
 
 	// Neighbor cells
 	uint3 cells[N];
 	const uint3 cellMin = max(DTid, 1) - 1;
-	const uint3 cellMax = min(DTid + 1, dim - 1);
+	const uint3 cellMax = min(DTid + 1, gridSize - 1);
 	cells[L] = uint3(cellMin.x, DTid.yz);
 	cells[R] = uint3(cellMax.x, DTid.yz);
 	cells[U] = uint3(DTid.x, cellMin.y, DTid.z);
@@ -79,9 +79,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 	// Boundary process
 	int3 offset;
-	offset.x = DTid.x + 1 >= dim.x ? -1 : (DTid.x < 1 ? 1 : 0);
-	offset.y = DTid.y + 1 >= dim.y ? -1 : (DTid.y < 1 ? 1 : 0);
-	offset.z = DTid.z + 1 >= dim.z ? -1 : (DTid.z < 1 ? 1 : 0);
+	offset.x = DTid.x + 1 >= gridSize.x ? -1 : (DTid.x < 1 ? 1 : 0);
+	offset.y = DTid.y + 1 >= gridSize.y ? -1 : (DTid.y < 1 ? 1 : 0);
+	offset.z = DTid.z + 1 >= gridSize.z ? -1 : (DTid.z < 1 ? 1 : 0);
 	if (any(offset)) u = -g_txVelocity[DTid + offset];
 
 	// Poisson solver

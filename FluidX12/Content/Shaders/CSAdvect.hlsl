@@ -29,6 +29,22 @@ Texture3D			g_txColor;
 SamplerState g_smpLinear;
 
 //--------------------------------------------------------------------------------------
+// Grid space to simulation space
+//--------------------------------------------------------------------------------------
+float3 GridToSimulationSpace(uint3 index, float3 gridSize)
+{
+	return (index + 0.5) / gridSize;
+}
+
+//--------------------------------------------------------------------------------------
+// Grid space to simulation space
+//--------------------------------------------------------------------------------------
+float3 SimulationToTextureSpace(float3 pos, float3 gridSize)
+{
+	return pos;
+}
+
+//--------------------------------------------------------------------------------------
 // Gaussian function
 //--------------------------------------------------------------------------------------
 float Gaussian(float3 disp, float r)
@@ -45,14 +61,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	const float timeStep = g_timeStep;
 
 	// Fetch velocity field
-	float3 dim;
-	g_txVelocity.GetDimensions(dim.x, dim.y, dim.z);
+	float3 gridSize;
+	g_txVelocity.GetDimensions(gridSize.x, gridSize.y, gridSize.z);
 	const float3 u = g_txVelocity[DTid];
 
 	// Advections
-	const float3 texel = 1.0 / dim;
-	const float3 pos = (DTid + 0.5) * texel;
-	const float3 adv = pos - u * timeStep;
+	const float3 pos = GridToSimulationSpace(DTid, gridSize);
+	const float3 adv = SimulationToTextureSpace(pos - u * timeStep, gridSize);
 	float3 w = g_txVelocity.SampleLevel(g_smpLinear, adv, 0.0);
 #if ADVECT_COLOR
 	float4 color = g_txColor.SampleLevel(g_smpLinear, adv, 0.0);
@@ -65,7 +80,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	{
 		const float3 vortForce = float3(-disp.z, 0.0, disp.x) * g_vortScl;
 		float3 extForce = g_extForce * basis;
-		extForce = dim.z > 1 ? extForce * g_forceScl3D + vortForce : extForce;
+		extForce = gridSize.z > 1 ? extForce * g_forceScl3D + vortForce : extForce;
 		w += extForce * timeStep;
 #if ADVECT_COLOR
 		color += g_impulse * timeStep * basis;

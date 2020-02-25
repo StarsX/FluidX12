@@ -55,13 +55,13 @@ void Project(RWTexture3D<float> rwQ, inout float3 u, uint3 cells[N])
 [numthreads(8, 8, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
-	uint3 dim;
-	g_txVelocity.GetDimensions(dim.x, dim.y, dim.z);
+	uint3 gridSize;
+	g_txVelocity.GetDimensions(gridSize.x, gridSize.y, gridSize.z);
 
 	// Neighbor cells
 	uint3 cells[N];
 	const uint2 cellMin = max(DTid.xy, 1) - 1;
-	const uint2 cellMax = min(DTid.xy + 1, dim.xy - 1);
+	const uint2 cellMax = min(DTid.xy + 1, gridSize.xy - 1);
 	cells[L] = uint3(cellMin.x, DTid.y, 0);
 	cells[R] = uint3(cellMax.x, DTid.y, 0);
 	cells[U] = uint3(DTid.x, cellMin.y, 0);
@@ -72,8 +72,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	float3 u = g_txVelocity[DTid];
 
 	int3 offset;
-	offset.x = DTid.x + 1 >= dim.x ? -1 : (DTid.x < 1 ? 1 : 0);
-	offset.y = DTid.y + 1 >= dim.y ? -1 : (DTid.y < 1 ? 1 : 0);
+	offset.x = DTid.x + 1 >= gridSize.x ? -1 : (DTid.x < 1 ? 1 : 0);
+	offset.y = DTid.y + 1 >= gridSize.y ? -1 : (DTid.y < 1 ? 1 : 0);
 	offset.z = 0;
 	if (any(offset.xy)) u = -g_txVelocity[DTid + offset];
 
