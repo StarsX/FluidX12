@@ -158,12 +158,9 @@ void Fluid::Simulate(const CommandList& commandList)
 
 void Fluid::Render(const CommandList& commandList)
 {
-	if (m_gridSize.z > 1) rayCast(commandList);
-	else
-	{
-		if (m_numParticles > 0) renderParticles(commandList);
-		else visualizeColor(commandList);
-	}
+	if (m_numParticles > 0) renderParticles(commandList);
+	else if (m_gridSize.z > 1) rayCast(commandList);
+	else visualizeColor(commandList);
 }
 
 bool Fluid::createPipelineLayouts()
@@ -193,7 +190,26 @@ bool Fluid::createPipelineLayouts()
 			PipelineLayoutFlag::NONE, L"ProjectionLayout"), false);
 	}
 
-	if (m_gridSize.z > 1)
+	if (m_numParticles > 0)
+	{
+		// Particle rendering
+		struct CBPerFrame
+		{
+			float TimeStep;
+			uint32_t BaseSeed;
+		};
+		Util::PipelineLayout pipelineLayout;
+		pipelineLayout.SetConstants(0, SizeOfInUint32(CBPerFrame), 0, 0, Shader::Stage::VS);
+		pipelineLayout.SetConstants(1, SizeOfInUint32(XMMATRIX), 1, 0, Shader::Stage::VS);
+		pipelineLayout.SetRootUAV(2, 0, 0, DescriptorRangeFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE, Shader::Stage::VS);
+		pipelineLayout.SetRange(3, DescriptorType::SRV, 1, 0);
+		pipelineLayout.SetRange(4, DescriptorType::SAMPLER, 1, 0);
+		pipelineLayout.SetShaderStage(3, Shader::Stage::VS);
+		pipelineLayout.SetShaderStage(4, Shader::Stage::VS);
+		X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
+			PipelineLayoutFlag::NONE, L"ParticleLayout"), false);
+	}
+	else if (m_gridSize.z > 1)
 	{
 		// Ray casting
 		Util::PipelineLayout pipelineLayout;
@@ -208,36 +224,14 @@ bool Fluid::createPipelineLayouts()
 	}
 	else
 	{
-		if (m_numParticles > 0)
-		{
-			// Particle rendering
-			struct CBPerFrame
-			{
-				float TimeStep;
-				uint32_t BaseSeed;
-			};
-			Util::PipelineLayout pipelineLayout;
-			pipelineLayout.SetConstants(0, SizeOfInUint32(CBPerFrame), 0, 0, Shader::Stage::VS);
-			pipelineLayout.SetConstants(1, SizeOfInUint32(XMMATRIX), 1, 0, Shader::Stage::VS);
-			pipelineLayout.SetRootUAV(2, 0, 0, DescriptorRangeFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE, Shader::Stage::VS);
-			pipelineLayout.SetRange(3, DescriptorType::SRV, 1, 0);
-			pipelineLayout.SetRange(4, DescriptorType::SAMPLER, 1, 0);
-			pipelineLayout.SetShaderStage(3, Shader::Stage::VS);
-			pipelineLayout.SetShaderStage(4, Shader::Stage::VS);
-			X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
-				PipelineLayoutFlag::NONE, L"ParticleLayout"), false);
-		}
-		else
-		{
-			// Visualization
-			Util::PipelineLayout pipelineLayout;
-			pipelineLayout.SetRange(0, DescriptorType::SRV, 1, 0);
-			pipelineLayout.SetRange(1, DescriptorType::SAMPLER, 1, 0);
-			pipelineLayout.SetShaderStage(0, Shader::PS);
-			pipelineLayout.SetShaderStage(1, Shader::PS);
-			X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
-				PipelineLayoutFlag::NONE, L"VisualizationLayout"), false);
-		}
+		// Visualization
+		Util::PipelineLayout pipelineLayout;
+		pipelineLayout.SetRange(0, DescriptorType::SRV, 1, 0);
+		pipelineLayout.SetRange(1, DescriptorType::SAMPLER, 1, 0);
+		pipelineLayout.SetShaderStage(0, Shader::PS);
+		pipelineLayout.SetShaderStage(1, Shader::PS);
+		X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
+			PipelineLayoutFlag::NONE, L"VisualizationLayout"), false);
 	}
 
 	return true;
@@ -273,7 +267,23 @@ bool Fluid::createPipelines(Format rtFormat)
 
 	// Visualization
 	N_RETURN(m_shaderPool.CreateShader(Shader::Stage::VS, vsIndex, L"VSScreenQuad.cso"), false);
-	if (m_gridSize.z > 1)
+	if (m_numParticles > 0)
+	{
+		// Particle rendering
+		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::VS, vsIndex, L"VSParticle.cso"), false);
+		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::PS, psIndex, L"PSConstColor.cso"), false);
+
+		Graphics::State state;
+		state.SetPipelineLayout(m_pipelineLayouts[VISUALIZE]);
+		state.SetShader(Shader::Stage::VS, m_shaderPool.GetShader(Shader::Stage::VS, vsIndex++));
+		state.SetShader(Shader::Stage::PS, m_shaderPool.GetShader(Shader::Stage::PS, psIndex));
+		state.DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache);
+		state.IASetPrimitiveTopologyType(PrimitiveTopologyType::POINT);
+		state.OMSetNumRenderTargets(1);
+		state.OMSetRTVFormat(0, rtFormat);
+		X_RETURN(m_pipelines[VISUALIZE], state.GetPipeline(m_graphicsPipelineCache, L"Particle"), false);
+	}
+	else if (m_gridSize.z > 1)
 	{
 		// Ray casting
 		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::PS, psIndex, L"PSRayCast.cso"), false);
@@ -290,38 +300,17 @@ bool Fluid::createPipelines(Format rtFormat)
 	}
 	else
 	{
-		if (m_numParticles > 0)
-		{
-			// Particle rendering
-			{
-				N_RETURN(m_shaderPool.CreateShader(Shader::Stage::VS, vsIndex, L"VSParticle.cso"), false);
-				N_RETURN(m_shaderPool.CreateShader(Shader::Stage::PS, psIndex, L"PSConstColor.cso"), false);
+		// Visualization
+		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::PS, psIndex, L"PSVisualizeColor.cso"), false);
 
-				Graphics::State state;
-				state.SetPipelineLayout(m_pipelineLayouts[VISUALIZE]);
-				state.SetShader(Shader::Stage::VS, m_shaderPool.GetShader(Shader::Stage::VS, vsIndex++));
-				state.SetShader(Shader::Stage::PS, m_shaderPool.GetShader(Shader::Stage::PS, psIndex));
-				state.DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache);
-				state.IASetPrimitiveTopologyType(PrimitiveTopologyType::POINT);
-				state.OMSetNumRenderTargets(1);
-				state.OMSetRTVFormat(0, rtFormat);
-				X_RETURN(m_pipelines[VISUALIZE], state.GetPipeline(m_graphicsPipelineCache, L"Particle"), false);
-			}
-		}
-		else
-		{
-			// Visualization
-			N_RETURN(m_shaderPool.CreateShader(Shader::Stage::PS, psIndex, L"PSVisualizeColor.cso"), false);
-
-			Graphics::State state;
-			state.SetPipelineLayout(m_pipelineLayouts[VISUALIZE]);
-			state.SetShader(Shader::Stage::VS, m_shaderPool.GetShader(Shader::Stage::VS, vsIndex));
-			state.SetShader(Shader::Stage::PS, m_shaderPool.GetShader(Shader::Stage::PS, psIndex++));
-			state.IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
-			state.DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache);
-			state.OMSetRTVFormats(&rtFormat, 1);
-			X_RETURN(m_pipelines[VISUALIZE], state.GetPipeline(m_graphicsPipelineCache, L"Visualization"), false);
-		}
+		Graphics::State state;
+		state.SetPipelineLayout(m_pipelineLayouts[VISUALIZE]);
+		state.SetShader(Shader::Stage::VS, m_shaderPool.GetShader(Shader::Stage::VS, vsIndex));
+		state.SetShader(Shader::Stage::PS, m_shaderPool.GetShader(Shader::Stage::PS, psIndex++));
+		state.IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
+		state.DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache);
+		state.OMSetRTVFormats(&rtFormat, 1);
+		X_RETURN(m_pipelines[VISUALIZE], state.GetPipeline(m_graphicsPipelineCache, L"Visualization"), false);
 	}
 
 	return true;
@@ -383,7 +372,7 @@ bool Fluid::createDescriptorTables()
 
 bool Fluid::needColorField() const
 {
-	return m_numParticles <= 0 || m_gridSize.z > 1;
+	return m_numParticles <= 0;
 }
 
 void Fluid::visualizeColor(const CommandList& commandList)
@@ -442,9 +431,12 @@ void Fluid::renderParticles(const CommandList& commandList)
 {
 	// General matrices
 	XMMATRIX worldViewProj;
-	if (m_gridSize.z > 1) generateMatrices(worldViewProj);
+	if (m_gridSize.z > 1)
+	{
+		generateMatrices(worldViewProj);
+		worldViewProj = XMMatrixTranspose(worldViewProj);
+	}
 	else worldViewProj = XMMatrixIdentity();
-	generateMatrices(worldViewProj);
 
 	// Set barrier
 	ResourceBarrier barrier;

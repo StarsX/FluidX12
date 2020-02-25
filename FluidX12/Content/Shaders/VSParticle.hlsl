@@ -25,7 +25,7 @@ cbuffer cbPerObject
 	matrix g_worldViewProj;
 };
 
-static const float g_fullLife = 1.5;
+static const float g_fullLife = 2.0;
 
 //--------------------------------------------------------------------------------------
 // Buffer and texture
@@ -67,24 +67,35 @@ uint rand(inout uint2 seed, uint range)
 //--------------------------------------------------------------------------------------
 // Common particle emission
 //--------------------------------------------------------------------------------------
-void Emit(uint particleId, inout Particle particle)
+void Emit(uint particleId, inout Particle particle, bool is3D)
 {
 	// Load emitter with a random index
 	uint2 seed = { particleId, g_baseSeed };
 	const float r = g_impulseR * rand(seed, 1000) / 1000.0f;
-	const float t = rand(seed, 1000) / 1000.0f;
-	const float x = r * cos(t * 2.0 * PI);
-	const float y = r * sin(t * 2.0 * PI);
+	const float t = rand(seed, 1000) / 1000.0;
+	const float theta = t * 2.0 * PI;
+	float3 sphere;
+	sphere.x = r * cos(theta);
+	sphere.y = r * sin(theta);
+	sphere.z = 0.0;
+
+	if (is3D)
+	{
+		const float s = rand(seed, 1000) / 1000.0;
+		const float phi = s * PI;
+		sphere.xy *= sin(phi);
+		sphere.z = r * cos(phi);
+	}
 
 	// Particle emission
-	particle.Pos = g_impulsePos + float3(x, y, 0.0);
+	particle.Pos = g_impulsePos + sphere;
 	particle.LifeTime = g_fullLife + rand(seed, 1000) / 1000.0f;
 }
 
 //--------------------------------------------------------------------------------------
 // Particle integration or emission
 //--------------------------------------------------------------------------------------
-void UpdateParticle(uint particleId, inout Particle particle)
+void UpdateParticle(uint particleId, inout Particle particle, bool is3D)
 {
 	if (particle.LifeTime > 0.0)
 	{
@@ -93,7 +104,7 @@ void UpdateParticle(uint particleId, inout Particle particle)
 		particle.Pos += particle.Velocity * g_timeStep;
 		particle.LifeTime -= g_timeStep;
 	}
-	else Emit(particleId, particle);
+	else Emit(particleId, particle, is3D);
 
 	g_rwParticles[particleId] = particle;
 }
@@ -107,11 +118,11 @@ float4 main(uint ParticleId : SV_VERTEXID) : SV_POSITION
 	Particle particle = g_rwParticles[ParticleId];
 
 	// Update particle
-	UpdateParticle(ParticleId, particle);
-
-	// Calculate world position
 	uint3 dim;
 	g_txVelocity.GetDimensions(dim.x, dim.y, dim.z);
+	UpdateParticle(ParticleId, particle, dim.z > 1);
+
+	// Calculate world position
 	float3 pos = particle.Pos * 2.0 - 1.0;
 	pos.y = -pos.y;
 	pos.z = dim.z > 1 ? pos.z : 0.0;
