@@ -64,7 +64,8 @@ protected:
 
 	void visualizeColor(const XUSG::CommandList& commandList);
 	void rayCast(const XUSG::CommandList& commandList);
-	void particle2D(const XUSG::CommandList& commandList);
+	void renderParticles(const XUSG::CommandList& commandList);
+	void generateMatrices(DirectX::XMMATRIX& worldViewProj, DirectX::XMMATRIX* pWorldI = nullptr) const;
 
 	XUSG::Device m_device;
 

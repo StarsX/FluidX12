@@ -18,8 +18,13 @@ struct Particle
 };
 
 //--------------------------------------------------------------------------------------
-// Constant
+// Constants
 //--------------------------------------------------------------------------------------
+cbuffer cbPerObject
+{
+	matrix g_worldViewProj;
+};
+
 static const float g_fullLife = 1.5;
 
 //--------------------------------------------------------------------------------------
@@ -33,6 +38,9 @@ Texture3D<float3> g_txVelocity;
 //--------------------------------------------------------------------------------------
 SamplerState g_smpLinear;
 
+//--------------------------------------------------------------------------------------
+// Random number generator
+//--------------------------------------------------------------------------------------
 uint rand(inout uint seed)
 {
 	// The same implementation of current Windows rand()
@@ -48,6 +56,9 @@ uint rand(inout uint seed)
 	return (seed >> 0x10) & RAND_MAX;
 }
 
+//--------------------------------------------------------------------------------------
+// Random number generator with a range
+//--------------------------------------------------------------------------------------
 uint rand(inout uint2 seed, uint range)
 {
 	return (rand(seed.x) | (rand(seed.y) << 16)) % range;
@@ -69,7 +80,6 @@ void Emit(uint particleId, inout Particle particle)
 	particle.Pos = g_impulsePos + float3(x, y, 0.0);
 	particle.LifeTime = g_fullLife + rand(seed, 1000) / 1000.0f;
 }
-
 
 //--------------------------------------------------------------------------------------
 // Particle integration or emission
@@ -99,8 +109,12 @@ float4 main(uint ParticleId : SV_VERTEXID) : SV_POSITION
 	// Update particle
 	UpdateParticle(ParticleId, particle);
 
-	float2 pos = particle.Pos.xy * 2.0 - 1.0;
+	// Calculate world position
+	uint3 dim;
+	g_txVelocity.GetDimensions(dim.x, dim.y, dim.z);
+	float3 pos = particle.Pos * 2.0 - 1.0;
 	pos.y = -pos.y;
+	pos.z = dim.z > 1 ? pos.z : 0.0;
 
-	return float4(pos, 0.0, 1.0);
+	return mul(float4(pos, 1.0), g_worldViewProj);
 }

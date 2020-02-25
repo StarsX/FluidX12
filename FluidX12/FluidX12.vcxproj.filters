@@ -195,9 +195,6 @@
     <FxCompile Include="Content\Shaders\CSProject3D.hlsl">
       <Filter>Shaders\Simulation</Filter>
     </FxCompile>
-    <FxCompile Include="Content\Shaders\VSParticle2D.hlsl">
-      <Filter>Shaders\Particle</Filter>
-    </FxCompile>
     <FxCompile Include="Content\Shaders\PSRayCast.hlsl">
       <Filter>Shaders\Rendering</Filter>
     </FxCompile>
@@ -209,6 +206,9 @@
     </FxCompile>
     <FxCompile Include="Content\Shaders\PSConstColor.hlsl">
       <Filter>Shaders\Rendering</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\VSParticle.hlsl">
+      <Filter>Shaders\Particle</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>

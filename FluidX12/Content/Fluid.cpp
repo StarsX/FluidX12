@@ -90,7 +90,7 @@ void Fluid::UpdateFrame(float timeStep, CXMMATRIX viewProj, const XMFLOAT3& eyeP
 {
 	m_timeStep = timeStep;
 	m_frameParity = !m_frameParity;
-	XMStoreFloat4x4(&m_viewProj, XMMatrixTranspose(viewProj));
+	XMStoreFloat4x4(&m_viewProj, viewProj);
 	m_eyePt = eyePt;
 }
 
@@ -161,7 +161,7 @@ void Fluid::Render(const CommandList& commandList)
 	if (m_gridSize.z > 1) rayCast(commandList);
 	else
 	{
-		if (m_numParticles > 0) particle2D(commandList);
+		if (m_numParticles > 0) renderParticles(commandList);
 		else visualizeColor(commandList);
 	}
 }
@@ -210,7 +210,7 @@ bool Fluid::createPipelineLayouts()
 	{
 		if (m_numParticles > 0)
 		{
-			// 2D Particle rendering
+			// Particle rendering
 			struct CBPerFrame
 			{
 				float TimeStep;
@@ -218,13 +218,14 @@ bool Fluid::createPipelineLayouts()
 			};
 			Util::PipelineLayout pipelineLayout;
 			pipelineLayout.SetConstants(0, SizeOfInUint32(CBPerFrame), 0, 0, Shader::Stage::VS);
-			pipelineLayout.SetRootUAV(1, 0, 0, DescriptorRangeFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE, Shader::Stage::VS);
-			pipelineLayout.SetRange(2, DescriptorType::SRV, 1, 0);
-			pipelineLayout.SetRange(3, DescriptorType::SAMPLER, 1, 0);
-			pipelineLayout.SetShaderStage(2, Shader::Stage::VS);
+			pipelineLayout.SetConstants(1, SizeOfInUint32(XMMATRIX), 1, 0, Shader::Stage::VS);
+			pipelineLayout.SetRootUAV(2, 0, 0, DescriptorRangeFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE, Shader::Stage::VS);
+			pipelineLayout.SetRange(3, DescriptorType::SRV, 1, 0);
+			pipelineLayout.SetRange(4, DescriptorType::SAMPLER, 1, 0);
 			pipelineLayout.SetShaderStage(3, Shader::Stage::VS);
+			pipelineLayout.SetShaderStage(4, Shader::Stage::VS);
 			X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
-				PipelineLayoutFlag::NONE, L"Particle2DLayout"), false);
+				PipelineLayoutFlag::NONE, L"ParticleLayout"), false);
 		}
 		else
 		{
@@ -291,9 +292,9 @@ bool Fluid::createPipelines(Format rtFormat)
 	{
 		if (m_numParticles > 0)
 		{
-			// 2D Particle rendering
+			// Particle rendering
 			{
-				N_RETURN(m_shaderPool.CreateShader(Shader::Stage::VS, vsIndex, L"VSParticle2D.cso"), false);
+				N_RETURN(m_shaderPool.CreateShader(Shader::Stage::VS, vsIndex, L"VSParticle.cso"), false);
 				N_RETURN(m_shaderPool.CreateShader(Shader::Stage::PS, psIndex, L"PSConstColor.cso"), false);
 
 				Graphics::State state;
@@ -304,7 +305,7 @@ bool Fluid::createPipelines(Format rtFormat)
 				state.IASetPrimitiveTopologyType(PrimitiveTopologyType::POINT);
 				state.OMSetNumRenderTargets(1);
 				state.OMSetRTVFormat(0, rtFormat);
-				X_RETURN(m_pipelines[VISUALIZE], state.GetPipeline(m_graphicsPipelineCache, L"Particle2D"), false);
+				X_RETURN(m_pipelines[VISUALIZE], state.GetPipeline(m_graphicsPipelineCache, L"Particle"), false);
 			}
 		}
 		else
@@ -403,9 +404,8 @@ void Fluid::visualizeColor(const CommandList& commandList)
 void Fluid::rayCast(const CommandList& commandList)
 {
 	// General matrices
-	const auto world = XMMatrixScaling(8.0f, 8.0f, 8.0f);
-	const auto worldI = XMMatrixInverse(nullptr, world);
-	const auto worldViewProj = world * XMMatrixTranspose(XMLoadFloat4x4(&m_viewProj));
+	XMMATRIX worldViewProj, worldI;
+	generateMatrices(worldViewProj, &worldI);
 
 	// Screen space matrices
 	CBPerObject cbPerObject;
@@ -438,8 +438,14 @@ void Fluid::rayCast(const CommandList& commandList)
 	commandList.Draw(3, 1, 0, 0);
 }
 
-void Fluid::particle2D(const CommandList& commandList)
+void Fluid::renderParticles(const CommandList& commandList)
 {
+	// General matrices
+	XMMATRIX worldViewProj;
+	if (m_gridSize.z > 1) generateMatrices(worldViewProj);
+	else worldViewProj = XMMatrixIdentity();
+	generateMatrices(worldViewProj);
+
 	// Set barrier
 	ResourceBarrier barrier;
 	const auto numBarriers = m_velocities[0].SetBarrier(&barrier, ResourceState::NON_PIXEL_SHADER_RESOURCE);;
@@ -454,9 +460,17 @@ void Fluid::particle2D(const CommandList& commandList)
 	// Set descriptor tables
 	commandList.SetGraphics32BitConstant(0, reinterpret_cast<uint32_t&>(m_timeStep));
 	commandList.SetGraphics32BitConstant(0, rand(), SizeOfInUint32(m_timeStep));
-	commandList.SetGraphicsRootUnorderedAccessView(1, m_particleBuffer.GetResource());
-	commandList.SetGraphicsDescriptorTable(2, m_srvUavTables[SRV_UAV_TABLE_VECOLITY]);
-	commandList.SetGraphicsDescriptorTable(3, m_samplerTables[SAMPLER_TABLE_CLAMP]);
+	commandList.SetGraphics32BitConstants(1, SizeOfInUint32(XMMATRIX), &worldViewProj);
+	commandList.SetGraphicsRootUnorderedAccessView(2, m_particleBuffer.GetResource());
+	commandList.SetGraphicsDescriptorTable(3, m_srvUavTables[SRV_UAV_TABLE_VECOLITY]);
+	commandList.SetGraphicsDescriptorTable(4, m_samplerTables[SAMPLER_TABLE_CLAMP]);
 
 	commandList.Draw(m_numParticles, 1, 0, 0);
+}
+
+void Fluid::generateMatrices(XMMATRIX& worldViewProj, XMMATRIX* pWorldI) const
+{
+	const auto world = XMMatrixScaling(10.0f, 10.0f, 10.0f);
+	worldViewProj = world * XMLoadFloat4x4(&m_viewProj);
+	if (pWorldI) *pWorldI = XMMatrixInverse(nullptr, world);
 }
