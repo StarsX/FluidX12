@@ -16,12 +16,10 @@ static const float	g_dissipation = 0.1;
 // Textures
 //--------------------------------------------------------------------------------------
 RWTexture3D<float3> g_rwVelocity;
-Texture3D<float3>	g_txVelocity;
-
-#if ADVECT_COLOR
 RWTexture3D<float4>	g_rwColor;
+
+Texture3D<float3>	g_txVelocity;
 Texture3D			g_txColor;
-#endif
 
 //--------------------------------------------------------------------------------------
 // Sampler
@@ -53,35 +51,34 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	// Fetch velocity field
 	float3 gridSize;
 	g_txVelocity.GetDimensions(gridSize.x, gridSize.y, gridSize.z);
-	const float3 u = g_txVelocity[DTid];
+	float3 u = g_txVelocity[DTid];
+	float4 color = 0.0;
 
 	// Advections
 	const float timeStep = g_timeStep;
-	const float3 pos = GridToSimulationSpace(DTid, gridSize);
-	const float3 adv = SimulationToTextureSpace(pos - u * timeStep, gridSize);
-	float3 w = g_txVelocity.SampleLevel(g_smpLinear, adv, 0.0);
-#if ADVECT_COLOR
-	float4 color = g_txColor.SampleLevel(g_smpLinear, adv, 0.0);
-#endif
-
-	// Impulse
-	const float3 disp = pos - g_impulsePos;
-	float basis = Gaussian(disp, g_impulseR);
-	if (basis >= exp(-4.0))
+	if (timeStep > 0.0)
 	{
-		//basis = sqrt(basis) * 0.4;
-		const float3 vortForce = float3(-disp.z, 0.0, disp.x) * g_vortScl;
-		float3 extForce = g_extForce * basis;
-		extForce = gridSize.z > 1 ? extForce * g_forceScl3D + vortForce : extForce;
-		w += extForce * timeStep;
-#if ADVECT_COLOR
-		color += g_impulse * timeStep * basis;
-#endif
+		const float3 pos = GridToSimulationSpace(DTid, gridSize);
+		const float3 adv = SimulationToTextureSpace(pos - u * timeStep, gridSize);
+		u = g_txVelocity.SampleLevel(g_smpLinear, adv, 0.0);
+		color = g_txColor.SampleLevel(g_smpLinear, adv, 0.0);
+
+		// Impulse
+		const float3 disp = pos - g_impulsePos;
+		float basis = Gaussian(disp, g_impulseR);
+		if (basis >= exp(-4.0))
+		{
+			//basis = sqrt(basis) * 0.4;
+			const float3 vortForce = float3(-disp.z, 0.0, disp.x) * g_vortScl;
+			float3 extForce = g_extForce * basis;
+			extForce = gridSize.z > 1 ? extForce * g_forceScl3D + vortForce : extForce;
+			u += extForce * timeStep;
+			color += g_impulse * timeStep * basis;
+		}
 	}
 
 	// Output
-	g_rwVelocity[DTid] = w;
-#if ADVECT_COLOR
-	g_rwColor[DTid] = color * max(1.0 - g_dissipation * timeStep, 0.0);
-#endif
+	g_rwVelocity[DTid] = u;
+	if (timeStep > 0.0) g_rwColor[DTid] = color * max(1.0 - g_dissipation * timeStep, 0.0);
+	else g_rwColor[DTid] = g_txColor[DTid];
 }
