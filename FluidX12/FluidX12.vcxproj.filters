@@ -186,9 +186,6 @@
     <FxCompile Include="Content\Shaders\CSAdvect.hlsl">
       <Filter>Shaders\Simulation</Filter>
     </FxCompile>
-    <FxCompile Include="Content\Shaders\CSAdvectVelocity.hlsl">
-      <Filter>Shaders\Simulation</Filter>
-    </FxCompile>
     <FxCompile Include="Content\Shaders\CSProject2D.hlsl">
       <Filter>Shaders\Simulation</Filter>
     </FxCompile>

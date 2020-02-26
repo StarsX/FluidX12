@@ -37,14 +37,6 @@ float3 GridToSimulationSpace(uint3 index, float3 gridSize)
 }
 
 //--------------------------------------------------------------------------------------
-// Grid space to simulation space
-//--------------------------------------------------------------------------------------
-float3 SimulationToTextureSpace(float3 pos, float3 gridSize)
-{
-	return pos;
-}
-
-//--------------------------------------------------------------------------------------
 // Gaussian function
 //--------------------------------------------------------------------------------------
 float Gaussian(float3 disp, float r)

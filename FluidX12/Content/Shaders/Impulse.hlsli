@@ -14,3 +14,11 @@ cbuffer cbPerFrame
 static const float3	g_impulsePos = { 0.5, 0.9, 0.5 };
 static const float	g_impulseR = 1.0 / 28.0;
 static const float4	g_impulse = float4(100.0, 40.0, 0.0, 64.0);
+
+//--------------------------------------------------------------------------------------
+// Grid space to simulation space
+//--------------------------------------------------------------------------------------
+float3 SimulationToTextureSpace(float3 pos, float3 gridSize)
+{
+	return pos;
+}

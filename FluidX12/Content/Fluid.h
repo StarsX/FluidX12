@@ -38,6 +38,8 @@ protected:
 		SRV_UAV_TABLE_VECOLITY1,
 		SRV_UAV_TABLE_COLOR,
 		SRV_UAV_TABLE_COLOR1,
+		UAV_TABLE_INCOMPRESS,
+		UAV_SRV_TABLE_PARTICLE,
 
 		NUM_SRV_UAV_TABLE
 	};
@@ -60,7 +62,6 @@ protected:
 	bool createPipelineLayouts();
 	bool createPipelines(XUSG::Format rtFormat);
 	bool createDescriptorTables();
-	bool needColorField() const;
 
 	void visualizeColor(const XUSG::CommandList& commandList);
 	void rayCast(const XUSG::CommandList& commandList);
@@ -79,7 +80,6 @@ protected:
 	XUSG::Pipeline			m_pipelines[NUM_PIPELINE];
 
 	XUSG::DescriptorTable	m_srvUavTables[NUM_SRV_UAV_TABLE];
-	XUSG::DescriptorTable	m_uavTable;	// Incompressibility
 	XUSG::DescriptorTable	m_samplerTables[NUM_SAMPLER_TABLE];
 
 	XUSG::Texture3D			m_incompress;

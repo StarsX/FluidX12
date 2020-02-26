@@ -17,6 +17,12 @@ struct Particle
 	float LifeTime;
 };
 
+struct VSOut
+{
+	float4 Pos		: SV_POSITION;
+	float4 Color	: COLOR;
+};
+
 //--------------------------------------------------------------------------------------
 // Constants
 //--------------------------------------------------------------------------------------
@@ -31,7 +37,8 @@ static const float g_fullLife = 2.0;
 // Buffer and texture
 //--------------------------------------------------------------------------------------
 RWStructuredBuffer<Particle> g_rwParticles;
-Texture3D<float3> g_txVelocity;
+Texture3D<float3>	g_txVelocity;
+Texture3D			g_txColor;
 
 //--------------------------------------------------------------------------------------
 // Sampler
@@ -95,12 +102,12 @@ void Emit(uint particleId, inout Particle particle, bool is3D)
 //--------------------------------------------------------------------------------------
 // Particle integration or emission
 //--------------------------------------------------------------------------------------
-void UpdateParticle(uint particleId, inout Particle particle, bool is3D)
+void UpdateParticle(uint particleId, inout Particle particle, float3 tex, bool is3D)
 {
 	if (particle.LifeTime > 0.0)
 	{
 		// Integrate and update particle
-		particle.Velocity = g_txVelocity.SampleLevel(g_smpLinear, particle.Pos, 0.0);
+		particle.Velocity = g_txVelocity.SampleLevel(g_smpLinear, tex, 0.0);
 		particle.Pos += particle.Velocity * g_timeStep;
 		particle.LifeTime -= g_timeStep;
 	}
@@ -124,21 +131,28 @@ float3 SimulationToObjectSpace(float3 pos, bool is3D)
 //--------------------------------------------------------------------------------------
 // Vertex shader of particle integration or emission
 //--------------------------------------------------------------------------------------
-float4 main(uint ParticleId : SV_VERTEXID) : SV_POSITION
+VSOut main(uint ParticleId : SV_VERTEXID)
 {
-	// Load particle
-	Particle particle = g_rwParticles[ParticleId];
+	VSOut output;
 
 	// Get grid size
-	uint3 gridSize;
+	float3 gridSize;
 	g_txVelocity.GetDimensions(gridSize.x, gridSize.y, gridSize.z);
 
+	// Load particle
+	Particle particle = g_rwParticles[ParticleId];
+	const float3 tex = SimulationToTextureSpace(particle.Pos, gridSize);
+	float4 color = g_txColor.SampleLevel(g_smpLinear, tex, 0.0);
+
 	// Update particle
-	const bool is3D = gridSize.z > 1;
-	UpdateParticle(ParticleId, particle, is3D);
+	const bool is3D = gridSize.z > 1.0;
+	UpdateParticle(ParticleId, particle, tex, is3D);
 
 	// Calculate object position
 	const float3 pos = SimulationToObjectSpace(particle.Pos, is3D);
 
-	return mul(float4(pos, 1.0), g_worldViewProj);
+	output.Pos = mul(float4(pos, 1.0), g_worldViewProj);
+	output.Color = color;
+
+	return output;
 }

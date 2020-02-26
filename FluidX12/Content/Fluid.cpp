@@ -46,10 +46,9 @@ bool Fluid::Init(const CommandList& commandList, uint32_t width, uint32_t height
 				ResourceFlag::ALLOW_SIMULTANEOUS_ACCESS), 1, MemoryType::DEFAULT,
 				(L"Velocity" + to_wstring(i)).c_str()), false);
 
-		if (needColorField())
-			N_RETURN(m_colors[i].Create(m_device, gridSize.x, gridSize.y, gridSize.z, Format::R16G16B16A16_FLOAT,
-				ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryType::DEFAULT,
-				(L"Color" + to_wstring(i)).c_str()), false);
+		N_RETURN(m_colors[i].Create(m_device, gridSize.x, gridSize.y, gridSize.z, Format::R8G8B8A8_UNORM,
+			ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryType::DEFAULT,
+			(L"Color" + to_wstring(i)).c_str()), false);
 	}
 
 	N_RETURN(m_incompress.Create(m_device, gridSize.x, gridSize.y, gridSize.z, Format::R32_FLOAT,
@@ -103,8 +102,7 @@ void Fluid::Simulate(const CommandList& commandList)
 		// Set barriers (promotions)
 		m_velocities[0].SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE);
 		auto numBarriers = m_velocities[1].SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
-		if (needColorField())
-			numBarriers = m_colors[m_frameParity].SetBarrier(barriers, ResourceState::UNORDERED_ACCESS, numBarriers);
+		numBarriers = m_colors[m_frameParity].SetBarrier(barriers, ResourceState::UNORDERED_ACCESS, numBarriers);
 		commandList.Barrier(numBarriers, barriers);
 
 		// Set pipeline state
@@ -115,8 +113,7 @@ void Fluid::Simulate(const CommandList& commandList)
 		commandList.SetCompute32BitConstant(0, reinterpret_cast<uint32_t&>(m_timeStep));
 		commandList.SetComputeDescriptorTable(1, m_srvUavTables[SRV_UAV_TABLE_VECOLITY]);
 		commandList.SetComputeDescriptorTable(2, m_samplerTables[SAMPLER_TABLE_MIRROR]);
-		if (needColorField())
-			commandList.SetComputeDescriptorTable(3, m_srvUavTables[SRV_UAV_TABLE_COLOR + m_frameParity]);
+		commandList.SetComputeDescriptorTable(3, m_srvUavTables[SRV_UAV_TABLE_COLOR + m_frameParity]);
 
 		commandList.Dispatch(DIV_UP(m_gridSize.x, 8), DIV_UP(m_gridSize.y, 8), m_gridSize.z);
 	}
@@ -126,9 +123,8 @@ void Fluid::Simulate(const CommandList& commandList)
 		// Set barriers
 		auto numBarriers = m_velocities[0].SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
 		numBarriers = m_velocities[1].SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE, numBarriers);
-		if (needColorField())
-			numBarriers = m_colors[m_frameParity].SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE |
-				ResourceState::PIXEL_SHADER_RESOURCE, numBarriers);
+		numBarriers = m_colors[m_frameParity].SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE |
+			ResourceState::PIXEL_SHADER_RESOURCE, numBarriers);
 		commandList.Barrier(numBarriers, barriers);
 
 		// Set pipeline state
@@ -172,11 +168,8 @@ bool Fluid::createPipelineLayouts()
 		pipelineLayout.SetRange(1, DescriptorType::SRV, 1, 0);
 		pipelineLayout.SetRange(1, DescriptorType::UAV, 1, 0);
 		pipelineLayout.SetRange(2, DescriptorType::SAMPLER, 1, 0);
-		if (needColorField())
-		{
-			pipelineLayout.SetRange(3, DescriptorType::SRV, 1, 1);
-			pipelineLayout.SetRange(3, DescriptorType::UAV, 1, 1);
-		}
+		pipelineLayout.SetRange(3, DescriptorType::SRV, 1, 1);
+		pipelineLayout.SetRange(3, DescriptorType::UAV, 1, 1);
 		X_RETURN(m_pipelineLayouts[ADVECT], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
 			PipelineLayoutFlag::NONE, L"AdvectionLayout"), false);
 	}
@@ -201,9 +194,11 @@ bool Fluid::createPipelineLayouts()
 		Util::PipelineLayout pipelineLayout;
 		pipelineLayout.SetConstants(0, SizeOfInUint32(CBPerFrame), 0, 0, Shader::Stage::VS);
 		pipelineLayout.SetConstants(1, SizeOfInUint32(XMMATRIX), 1, 0, Shader::Stage::VS);
-		pipelineLayout.SetRootUAV(2, 0, 0, DescriptorRangeFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE, Shader::Stage::VS);
-		pipelineLayout.SetRange(3, DescriptorType::SRV, 1, 0);
+		pipelineLayout.SetRange(2, DescriptorType::UAV, 1, 0, 0, DescriptorRangeFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
+		pipelineLayout.SetRange(2, DescriptorType::SRV, 1, 0);
+		pipelineLayout.SetRange(3, DescriptorType::SRV, 1, 1);
 		pipelineLayout.SetRange(4, DescriptorType::SAMPLER, 1, 0);
+		pipelineLayout.SetShaderStage(2, Shader::Stage::VS);
 		pipelineLayout.SetShaderStage(3, Shader::Stage::VS);
 		pipelineLayout.SetShaderStage(4, Shader::Stage::VS);
 		X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
@@ -245,8 +240,7 @@ bool Fluid::createPipelines(Format rtFormat)
 
 	// Advection
 	{
-		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::CS, csIndex, needColorField() ?
-			L"CSAdvect.cso" : L"CSAdvectVelocity.cso"), false);
+		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::CS, csIndex, L"CSAdvect.cso"), false);
 
 		Compute::State state;
 		state.SetPipelineLayout(m_pipelineLayouts[ADVECT]);
@@ -318,38 +312,44 @@ bool Fluid::createPipelines(Format rtFormat)
 
 bool Fluid::createDescriptorTables()
 {
+	if (m_numParticles > 0)
+	{
+		// Create particle UAV
+		Util::DescriptorTable uavTable;
+		uavTable.SetDescriptors(0, 1, &m_particleBuffer.GetUAV());
+		X_RETURN(m_srvUavTables[UAV_SRV_TABLE_PARTICLE], uavTable.GetCbvSrvUavTable(*m_descriptorTableCache), false);
+	}
+
 	// Create SRV and UAV tables
 	for (auto i = 0ui8; i < 2; ++i)
 	{
-		if (needColorField())
+		Util::DescriptorTable srvUavTable;
+		const Descriptor descriptors[] =
 		{
-			Util::DescriptorTable srvUavTable;
-			const Descriptor descriptors[] =
-			{
-				m_colors[(i + 1) % 2].GetSRV(),
-				m_colors[i].GetUAV()
-			};
-			srvUavTable.SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-			X_RETURN(m_srvUavTables[SRV_UAV_TABLE_COLOR + i], srvUavTable.GetCbvSrvUavTable(*m_descriptorTableCache), false);
-		}
-
-		{
-			Util::DescriptorTable srvUavTable;
-			const Descriptor descriptors[] =
-			{
-				m_velocities[i].GetSRV(),
-				m_velocities[(i + 1) % 2].GetUAV()
-			};
-			srvUavTable.SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-			X_RETURN(m_srvUavTables[SRV_UAV_TABLE_VECOLITY + i], srvUavTable.GetCbvSrvUavTable(*m_descriptorTableCache), false);
-		}
+			m_velocities[i].GetSRV(),
+			m_velocities[(i + 1) % 2].GetUAV()
+		};
+		srvUavTable.SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
+		X_RETURN(m_srvUavTables[SRV_UAV_TABLE_VECOLITY + i], srvUavTable.GetCbvSrvUavTable(*m_descriptorTableCache), false);
 	}
 
-	// Create incompressibility UAV
 	{
+		// Create incompressibility UAV
 		Util::DescriptorTable uavTable;
 		uavTable.SetDescriptors(0, 1, &m_incompress.GetUAV());
-		X_RETURN(m_uavTable, uavTable.GetCbvSrvUavTable(*m_descriptorTableCache), false);
+		X_RETURN(m_srvUavTables[UAV_TABLE_INCOMPRESS], uavTable.GetCbvSrvUavTable(*m_descriptorTableCache), false);
+	}
+
+	for (auto i = 0ui8; i < 2; ++i)
+	{
+		Util::DescriptorTable srvUavTable;
+		const Descriptor descriptors[] =
+		{
+			m_colors[(i + 1) % 2].GetSRV(),
+			m_colors[i].GetUAV()
+		};
+		srvUavTable.SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
+		X_RETURN(m_srvUavTables[SRV_UAV_TABLE_COLOR + i], srvUavTable.GetCbvSrvUavTable(*m_descriptorTableCache), false);
 	}
 
 	// Create the samplers
@@ -368,11 +368,6 @@ bool Fluid::createDescriptorTables()
 	}
 
 	return true;
-}
-
-bool Fluid::needColorField() const
-{
-	return m_numParticles <= 0;
 }
 
 void Fluid::visualizeColor(const CommandList& commandList)
@@ -453,8 +448,8 @@ void Fluid::renderParticles(const CommandList& commandList)
 	commandList.SetGraphics32BitConstant(0, reinterpret_cast<uint32_t&>(m_timeStep));
 	commandList.SetGraphics32BitConstant(0, rand(), SizeOfInUint32(m_timeStep));
 	commandList.SetGraphics32BitConstants(1, SizeOfInUint32(XMMATRIX), &worldViewProj);
-	commandList.SetGraphicsRootUnorderedAccessView(2, m_particleBuffer.GetResource());
-	commandList.SetGraphicsDescriptorTable(3, m_srvUavTables[SRV_UAV_TABLE_VECOLITY]);
+	commandList.SetGraphicsDescriptorTable(2, m_srvUavTables[UAV_SRV_TABLE_PARTICLE]);
+	commandList.SetGraphicsDescriptorTable(3, m_srvUavTables[SRV_UAV_TABLE_COLOR + !m_frameParity]);
 	commandList.SetGraphicsDescriptorTable(4, m_samplerTables[SAMPLER_TABLE_CLAMP]);
 
 	commandList.Draw(m_numParticles, 1, 0, 0);
