@@ -103,8 +103,6 @@ void Fluid::Simulate(const CommandList& commandList)
 	m_timeInterval += m_timeStep;
 	timeStep = m_timeInterval < timeStep ? 0.0f : timeStep;
 
-	if (timeStep <= 0.0f) return;
-
 	// Advection
 	{
 		// Set barriers (promotions)
@@ -140,7 +138,8 @@ void Fluid::Simulate(const CommandList& commandList)
 		commandList.SetPipelineState(m_pipelines[PROJECT]);
 
 		// Set descriptor tables
-		commandList.SetComputeDescriptorTable(0, m_srvUavTables[SRV_UAV_TABLE_VECOLITY1]);
+		commandList.SetCompute32BitConstant(0, reinterpret_cast<uint32_t&>(timeStep));
+		commandList.SetComputeDescriptorTable(1, m_srvUavTables[SRV_UAV_TABLE_VECOLITY1]);
 		
 		XMUINT3 numGroups;
 		if (m_gridSize.z > 1) // optimized for 3D
@@ -185,8 +184,9 @@ bool Fluid::createPipelineLayouts()
 	// Projection
 	{
 		Util::PipelineLayout pipelineLayout;
-		pipelineLayout.SetRange(0, DescriptorType::SRV, 1, 0);
-		pipelineLayout.SetRange(0, DescriptorType::UAV, 2, 0);
+		pipelineLayout.SetConstants(0, SizeOfInUint32(float), 0);
+		pipelineLayout.SetRange(1, DescriptorType::SRV, 1, 0);
+		pipelineLayout.SetRange(1, DescriptorType::UAV, 2, 0);
 		X_RETURN(m_pipelineLayouts[PROJECT], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
 			PipelineLayoutFlag::NONE, L"ProjectionLayout"), false);
 	}
