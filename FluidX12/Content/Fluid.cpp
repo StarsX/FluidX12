@@ -46,7 +46,7 @@ bool Fluid::Init(const CommandList& commandList, uint32_t width, uint32_t height
 				ResourceFlag::ALLOW_SIMULTANEOUS_ACCESS), 1, MemoryType::DEFAULT,
 				(L"Velocity" + to_wstring(i)).c_str()), false);
 
-		N_RETURN(m_colors[i].Create(m_device, gridSize.x, gridSize.y, gridSize.z, Format::R8G8B8A8_UNORM,
+		N_RETURN(m_colors[i].Create(m_device, gridSize.x, gridSize.y, gridSize.z, Format::R16G16B16A16_FLOAT,
 			ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryType::DEFAULT,
 			(L"Color" + to_wstring(i)).c_str()), false);
 	}
