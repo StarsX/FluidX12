@@ -15,14 +15,6 @@
 static const float g_density = 1.0;
 
 //--------------------------------------------------------------------------------------
-// Constant
-//--------------------------------------------------------------------------------------
-cbuffer cbPerFrame
-{
-	float g_timeStep;
-};
-
-//--------------------------------------------------------------------------------------
 // Textures
 //--------------------------------------------------------------------------------------
 Texture3D<float3>	g_txVelocity;
@@ -75,27 +67,22 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	cells[U] = uint3(DTid.x, cellMin.y, 0);
 	cells[D] = uint3(DTid.x, cellMax.y, 0);
 
-	// Fetch velocity field
+	// Fetch velocity field and compute divergence
 	float3 u = g_txVelocity[DTid];
+	const float b = GetDivergence(g_txVelocity, cells);
 
-	if (g_timeStep)
-	{
-		// Compute divergence
-		const float b = GetDivergence(g_txVelocity, cells);
+	// Boundary process
+	int3 offset;
+	offset.x = DTid.x + 1 >= gridSize.x ? -1 : (DTid.x < 1 ? 1 : 0);
+	offset.y = DTid.y + 1 >= gridSize.y ? -1 : (DTid.y < 1 ? 1 : 0);
+	offset.z = 0;
+	if (any(offset.xy)) u = -g_txVelocity[DTid + offset];
 
-		// Boundary process
-		int3 offset;
-		offset.x = DTid.x + 1 >= gridSize.x ? -1 : (DTid.x < 1 ? 1 : 0);
-		offset.y = DTid.y + 1 >= gridSize.y ? -1 : (DTid.y < 1 ? 1 : 0);
-		offset.z = 0;
-		if (any(offset.xy)) u = -g_txVelocity[DTid + offset];
+	// Poisson solver
+	Poisson(g_rwIncompress, b, DTid, cells);
 
-		// Poisson solver
-		Poisson(g_rwIncompress, b, DTid, cells);
-
-		// Projection
-		Project(g_rwIncompress, u, cells);
-	}
+	// Projection
+	Project(g_rwIncompress, u, cells);
 
 	g_rwVelocity[DTid] = u;
 }

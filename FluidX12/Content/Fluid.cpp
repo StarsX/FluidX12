@@ -89,7 +89,7 @@ bool Fluid::Init(const CommandList& commandList, uint32_t width, uint32_t height
 void Fluid::UpdateFrame(float timeStep, CXMMATRIX viewProj, const XMFLOAT3& eyePt)
 {
 	m_timeStep = timeStep;
-	m_frameParity = !m_frameParity;
+	if (timeStep > 0.0) m_frameParity = !m_frameParity;
 	XMStoreFloat4x4(&m_viewProj, viewProj);
 	m_eyePt = eyePt;
 }
@@ -102,6 +102,8 @@ void Fluid::Simulate(const CommandList& commandList)
 	m_timeInterval = m_timeInterval > timeStep ? 0.0f : m_timeInterval;
 	m_timeInterval += m_timeStep;
 	timeStep = m_timeInterval < timeStep ? 0.0f : timeStep;
+
+	if (timeStep <= 0.0f) return;
 
 	// Advection
 	{
@@ -138,8 +140,7 @@ void Fluid::Simulate(const CommandList& commandList)
 		commandList.SetPipelineState(m_pipelines[PROJECT]);
 
 		// Set descriptor tables
-		commandList.SetCompute32BitConstant(0, reinterpret_cast<uint32_t&>(timeStep));
-		commandList.SetComputeDescriptorTable(1, m_srvUavTables[SRV_UAV_TABLE_VECOLITY1]);
+		commandList.SetComputeDescriptorTable(0, m_srvUavTables[SRV_UAV_TABLE_VECOLITY1]);
 		
 		XMUINT3 numGroups;
 		if (m_gridSize.z > 1) // optimized for 3D
@@ -184,9 +185,8 @@ bool Fluid::createPipelineLayouts()
 	// Projection
 	{
 		Util::PipelineLayout pipelineLayout;
-		pipelineLayout.SetConstants(0, SizeOfInUint32(float), 0);
-		pipelineLayout.SetRange(1, DescriptorType::SRV, 1, 0);
-		pipelineLayout.SetRange(1, DescriptorType::UAV, 2, 0);
+		pipelineLayout.SetRange(0, DescriptorType::SRV, 1, 0);
+		pipelineLayout.SetRange(0, DescriptorType::UAV, 2, 0);
 		X_RETURN(m_pipelineLayouts[PROJECT], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
 			PipelineLayoutFlag::NONE, L"ProjectionLayout"), false);
 	}

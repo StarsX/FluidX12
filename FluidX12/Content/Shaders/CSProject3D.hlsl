@@ -14,15 +14,7 @@
 
 #include "CSPoisson.hlsli"
 
-static const float g_density = 0.5;
-
-//--------------------------------------------------------------------------------------
-// Constant
-//--------------------------------------------------------------------------------------
-cbuffer cbPerFrame
-{
-	float g_timeStep;
-};
+static const float g_density = 0.48;
 
 //--------------------------------------------------------------------------------------
 // Textures
@@ -81,27 +73,22 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	cells[F] = uint3(DTid.xy, cellMin.z);
 	cells[B] = uint3(DTid.xy, cellMax.z);
 
-	// Fetch velocity field
+	// Fetch velocity field and compute divergence
 	float3 u = g_txVelocity[DTid];
+	const float b = GetDivergence(g_txVelocity, cells);
 
-	if (g_timeStep)
-	{
-		// Compute divergence
-		const float b = GetDivergence(g_txVelocity, cells);
+	// Boundary process
+	int3 offset;
+	offset.x = DTid.x + 2 >= gridSize.x ? -1 : (DTid.x < 2 ? 1 : 0);
+	offset.y = DTid.y + 2 >= gridSize.y ? -1 : (DTid.y < 2 ? 1 : 0);
+	offset.z = DTid.z + 2 >= gridSize.z ? -1 : (DTid.z < 2 ? 1 : 0);
+	if (any(offset)) u = -g_txVelocity[DTid + offset];
 
-		// Boundary process
-		int3 offset;
-		offset.x = DTid.x + 2 >= gridSize.x ? -1 : (DTid.x < 2 ? 1 : 0);
-		offset.y = DTid.y + 2 >= gridSize.y ? -1 : (DTid.y < 2 ? 1 : 0);
-		offset.z = DTid.z + 2 >= gridSize.z ? -1 : (DTid.z < 2 ? 1 : 0);
-		if (any(offset)) u = -g_txVelocity[DTid + offset];
+	// Poisson solver
+	Poisson(g_rwIncompress, b, DTid, cells);
 
-		// Poisson solver
-		Poisson(g_rwIncompress, b, DTid, cells);
-
-		// Projection
-		Project(g_rwIncompress, u, cells);
-	}
+	// Projection
+	Project(g_rwIncompress, u, cells);
 
 	g_rwVelocity[DTid] = u;
 }
