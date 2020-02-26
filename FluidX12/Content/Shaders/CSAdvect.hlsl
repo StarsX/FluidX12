@@ -56,8 +56,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	const float3 u = g_txVelocity[DTid];
 
 	// Advections
-	const bool is3D = gridSize.z > 1;
-	const float timeStep = GetTimeStep(is3D);
+	const float timeStep = g_timeStep;
 	const float3 pos = GridToSimulationSpace(DTid, gridSize);
 	const float3 adv = SimulationToTextureSpace(pos - u * timeStep, gridSize);
 	float3 w = g_txVelocity.SampleLevel(g_smpLinear, adv, 0.0);
@@ -73,7 +72,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 		//basis = sqrt(basis) * 0.4;
 		const float3 vortForce = float3(-disp.z, 0.0, disp.x) * g_vortScl;
 		float3 extForce = g_extForce * basis;
-		extForce = is3D ? extForce * g_forceScl3D + vortForce : extForce;
+		extForce = gridSize.z > 1 ? extForce * g_forceScl3D + vortForce : extForce;
 		w += extForce * timeStep;
 #if ADVECT_COLOR
 		color += g_impulse * timeStep * basis;

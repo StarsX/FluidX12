@@ -93,6 +93,7 @@ protected:
 	DirectX::XMFLOAT3		m_eyePt;
 
 	float					m_timeStep;
+	float					m_timeInterval;
 	uint8_t					m_frameParity;
 	uint32_t				m_numParticles;
 };
