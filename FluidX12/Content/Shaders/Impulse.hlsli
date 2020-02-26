@@ -22,3 +22,11 @@ float3 SimulationToTextureSpace(float3 pos, float3 gridSize)
 {
 	return pos;
 }
+
+//--------------------------------------------------------------------------------------
+// Get time step
+//--------------------------------------------------------------------------------------
+float GetTimeStep(bool is3D)
+{
+	return clamp(g_timeStep, is3D ? 0.01 : 0.001, is3D ? 0.018 : 0.002);
+}

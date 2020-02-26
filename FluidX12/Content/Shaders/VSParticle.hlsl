@@ -107,9 +107,10 @@ void UpdateParticle(uint particleId, inout Particle particle, float3 tex, bool i
 	if (particle.LifeTime > 0.0)
 	{
 		// Integrate and update particle
+		const float timeStep = GetTimeStep(is3D);
 		particle.Velocity = g_txVelocity.SampleLevel(g_smpLinear, tex, 0.0);
-		particle.Pos += particle.Velocity * g_timeStep;
-		particle.LifeTime -= g_timeStep;
+		particle.Pos += particle.Velocity * timeStep;
+		particle.LifeTime -= timeStep;
 	}
 	else Emit(particleId, particle, is3D);
 
