@@ -33,7 +33,7 @@ float GetDivergence(Texture3D<float3> txU, uint3 cells[N])
 	const float fD = txU[cells[D]].y;
 
 	// Compute the divergence using central differences
-	return 0.5 * (fR - fL + fD - fU);
+	return 0.5 * ((fR - fL) + (fD - fU));
 }
 
 //--------------------------------------------------------------------------------------

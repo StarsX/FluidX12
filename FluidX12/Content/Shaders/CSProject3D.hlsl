@@ -14,7 +14,7 @@
 
 #include "CSPoisson.hlsli"
 
-static const float g_density = 0.4;
+static const float g_density = 0.48;
 
 //--------------------------------------------------------------------------------------
 // Textures
@@ -37,7 +37,7 @@ float GetDivergence(Texture3D<float3> txU, uint3 cells[N])
 	const float fB = txU[cells[B]].z;
 
 	// Compute the divergence using central differences
-	return 0.5 * (fR - fL + fD - fU + fB - fF);
+	return 0.5 * ((fR - fL) + (fD - fU) + (fB - fF));
 }
 
 //--------------------------------------------------------------------------------------
@@ -79,9 +79,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 	// Boundary process
 	int3 offset;
-	offset.x = DTid.x + 1 >= gridSize.x ? -1 : (DTid.x < 1 ? 1 : 0);
-	offset.y = DTid.y + 1 >= gridSize.y ? -1 : (DTid.y < 1 ? 1 : 0);
-	offset.z = DTid.z + 1 >= gridSize.z ? -1 : (DTid.z < 1 ? 1 : 0);
+	offset.x = DTid.x + 2 >= gridSize.x ? -1 : (DTid.x < 2 ? 1 : 0);
+	offset.y = DTid.y + 2 >= gridSize.y ? -1 : (DTid.y < 2 ? 1 : 0);
+	offset.z = DTid.z + 2 >= gridSize.z ? -1 : (DTid.z < 2 ? 1 : 0);
 	if (any(offset)) u = -g_txVelocity[DTid + offset];
 
 	// Poisson solver
