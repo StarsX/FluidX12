@@ -129,6 +129,30 @@ float3 SimulationToObjectSpace(float3 pos, bool is3D)
 }
 
 //--------------------------------------------------------------------------------------
+// Get density gradient
+//--------------------------------------------------------------------------------------
+float3 GetDensityGradient(float3 tex, float3 gridSize)
+{
+	const float3 halfTexel = 0.5 / gridSize;
+	const float rhoL = g_txColor.SampleLevel(g_smpLinear, tex + float3(-halfTexel.x, 0.0.xx), 0.0).w;
+	const float rhoR = g_txColor.SampleLevel(g_smpLinear, tex + float3(halfTexel.x, 0.0.xx), 0.0).w;
+	const float rhoU = g_txColor.SampleLevel(g_smpLinear, tex + float3(0.0, -halfTexel.y, 0.0), 0.0).w;
+	const float rhoD = g_txColor.SampleLevel(g_smpLinear, tex + float3(0.0, halfTexel.y, 0.0), 0.0).w;
+	const float rhoF = g_txColor.SampleLevel(g_smpLinear, tex + float3(0.0.xx, -halfTexel.z), 0.0).w;
+	const float rhoB = g_txColor.SampleLevel(g_smpLinear, tex + float3(0.0.xx, halfTexel.z), 0.0).w;
+
+	return float3(rhoR - rhoL, rhoD - rhoU, rhoB - rhoF);
+}
+
+float3 GetNormal(float3 tex, float3 gridSize)
+{
+	float3 gradient = GetDensityGradient(tex, gridSize);
+	gradient.z = gridSize.z > 1.0 ? gradient.z : -1.0;
+
+	return normalize(-gradient);
+}
+
+//--------------------------------------------------------------------------------------
 // Vertex shader of particle integration or emission
 //--------------------------------------------------------------------------------------
 VSOut main(uint ParticleId : SV_VERTEXID)
@@ -143,6 +167,7 @@ VSOut main(uint ParticleId : SV_VERTEXID)
 	Particle particle = g_rwParticles[ParticleId];
 	const float3 tex = SimulationToTextureSpace(particle.Pos, gridSize);
 	float4 color = g_txColor.SampleLevel(g_smpLinear, tex, 0.0);
+	const float3 nrm = GetNormal(tex, gridSize);
 
 	// Update particle
 	const bool is3D = gridSize.z > 1.0;
@@ -151,8 +176,11 @@ VSOut main(uint ParticleId : SV_VERTEXID)
 	// Calculate object position
 	const float3 pos = SimulationToObjectSpace(particle.Pos, is3D);
 
+	const float lightAmt = saturate(dot(nrm, normalize(float3(1.0, 1.0, -1.0))));
+
 	output.Pos = mul(float4(pos, 1.0), g_worldViewProj);
-	output.Color = color;
+	output.Color.xyz = PI * color.xyz * (lightAmt + 0.16);
+	output.Color.w = color.w;
 
 	return output;
 }

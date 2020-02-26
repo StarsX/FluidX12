@@ -14,7 +14,7 @@
 
 #include "CSPoisson.hlsli"
 
-static const float g_density = 0.48;
+static const float g_density = 0.4;
 
 //--------------------------------------------------------------------------------------
 // Textures

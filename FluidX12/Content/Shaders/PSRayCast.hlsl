@@ -114,6 +114,7 @@ min16float4 main(float4 sspos : SV_POSITION) : SV_TARGET
 	min16float transmit = 1.0;
 	// In-scattered radiance
 	min16float3 scatter = 0.0;
+	min16float3 ambient = 0.0;
 
 	for (uint i = 0; i < NUM_SAMPLES; ++i)
 	{
@@ -146,7 +147,7 @@ min16float4 main(float4 sspos : SV_POSITION) : SV_TARGET
 				tex = min16float3(0.5, -0.5, 0.5) * lightPos + 0.5;
 
 				// Get a sample along light ray
-				const min16float density = GetSample(tex).x;
+				const min16float density = GetSample(tex).w;
 
 				// Attenuate ray-throughput along light direction
 				lightTrans *= saturate(1.0 - ABSORPTION * g_lightStepScale * density);
@@ -157,6 +158,7 @@ min16float4 main(float4 sspos : SV_POSITION) : SV_TARGET
 			}
 
 			scatter += lightTrans * transmit * scaledColor.xyz;
+			ambient += transmit * scaledColor.xyz;
 		}
 
 		pos += step;
@@ -164,7 +166,7 @@ min16float4 main(float4 sspos : SV_POSITION) : SV_TARGET
 
 	//clip(ONE_THRESHOLD - transmit);
 
-	min16float3 result = scatter + 0.16;
+	min16float3 result = scatter + lerp(ambient, 1.0, 0.75) * 0.16;
 	//result = lerp(result, g_clearColor * g_clearColor, transmit);
 
 	return min16float4(sqrt(result), saturate(1.0 - transmit));
