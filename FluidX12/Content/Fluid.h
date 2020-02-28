@@ -15,7 +15,7 @@ public:
 
 	bool Init(const XUSG::CommandList& commandList, uint32_t width, uint32_t height,
 		std::shared_ptr<XUSG::DescriptorTableCache> descriptorTableCache,
-		std::vector<XUSG::Resource>& uploaders, XUSG::Format rtFormat,
+		std::vector<XUSG::Resource>& uploaders, XUSG::Format rtFormat, XUSG::Format dsFormat,
 		const DirectX::XMUINT3& gridSize, uint32_t numParticles = 0);
 
 	void UpdateFrame(float timeStep, DirectX::CXMMATRIX viewProj, const DirectX::XMFLOAT3& eyePt);
@@ -60,7 +60,7 @@ protected:
 	};
 
 	bool createPipelineLayouts();
-	bool createPipelines(XUSG::Format rtFormat);
+	bool createPipelines(XUSG::Format rtFormat, XUSG::Format dsFormat);
 	bool createDescriptorTables();
 
 	void visualizeColor(const XUSG::CommandList& commandList);

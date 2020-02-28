@@ -147,8 +147,8 @@ void FluidX::LoadAssets()
 	// Create fast hybrid fluid simulator
 	m_fluid = make_unique<Fluid>(m_device);
 	if (!m_fluid) ThrowIfFailed(E_FAIL);
-	if (!m_fluid->Init(m_commandList, m_width, m_height, m_descriptorTableCache,
-		uploaders, Format::B8G8R8A8_UNORM, m_gridSize, m_numParticles))
+	if (!m_fluid->Init(m_commandList, m_width, m_height, m_descriptorTableCache, uploaders,
+		Format::B8G8R8A8_UNORM, Format::D24_UNORM_S8_UINT, m_gridSize, m_numParticles))
 		ThrowIfFailed(E_FAIL);
 
 	// Close the command list and execute it to begin the initial GPU setup.
@@ -363,7 +363,7 @@ void FluidX::PopulateCommandList()
 	m_commandList.ClearRenderTargetView(m_renderTargets[m_frameIndex].GetRTV(), clearColor);
 	m_commandList.ClearDepthStencilView(m_depth.GetDSV(), ClearFlag::DEPTH, 1.0f);
 
-	m_commandList.OMSetRenderTargets(1, &m_renderTargets[m_frameIndex].GetRTV());
+	m_commandList.OMSetRenderTargets(1, &m_renderTargets[m_frameIndex].GetRTV(), &m_depth.GetDSV());
 
 	// Set viewport
 	Viewport viewport(0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height));

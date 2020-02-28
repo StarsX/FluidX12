@@ -32,7 +32,7 @@ Fluid::~Fluid()
 
 bool Fluid::Init(const CommandList& commandList, uint32_t width, uint32_t height,
 	shared_ptr<DescriptorTableCache> descriptorTableCache, vector<Resource>& uploaders,
-	Format rtFormat, const XMUINT3& gridSize, uint32_t numParticles)
+	Format rtFormat, Format dsFormat, const XMUINT3& gridSize, uint32_t numParticles)
 {
 	m_viewport = XMUINT2(width, height);
 	m_descriptorTableCache = descriptorTableCache;
@@ -80,7 +80,7 @@ bool Fluid::Init(const CommandList& commandList, uint32_t width, uint32_t height
 
 	// Create pipelines
 	N_RETURN(createPipelineLayouts(), false);
-	N_RETURN(createPipelines(rtFormat), false);
+	N_RETURN(createPipelines(rtFormat, dsFormat), false);
 	N_RETURN(createDescriptorTables(), false);
 
 	return true;
@@ -240,7 +240,7 @@ bool Fluid::createPipelineLayouts()
 	return true;
 }
 
-bool Fluid::createPipelines(Format rtFormat)
+bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 {
 	auto vsIndex = 0u;
 	auto psIndex = 0u;
@@ -279,10 +279,10 @@ bool Fluid::createPipelines(Format rtFormat)
 		state.SetPipelineLayout(m_pipelineLayouts[VISUALIZE]);
 		state.SetShader(Shader::Stage::VS, m_shaderPool.GetShader(Shader::Stage::VS, vsIndex++));
 		state.SetShader(Shader::Stage::PS, m_shaderPool.GetShader(Shader::Stage::PS, psIndex));
-		state.DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache);
 		state.IASetPrimitiveTopologyType(PrimitiveTopologyType::POINT);
 		state.OMSetNumRenderTargets(1);
 		state.OMSetRTVFormat(0, rtFormat);
+		state.OMSetDSVFormat(dsFormat);
 		X_RETURN(m_pipelines[VISUALIZE], state.GetPipeline(m_graphicsPipelineCache, L"Particle"), false);
 	}
 	else if (m_gridSize.z > 1)
