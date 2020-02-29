@@ -201,9 +201,6 @@
     <FxCompile Include="Content\Shaders\VSScreenQuad.hlsl">
       <Filter>Shaders\Rendering</Filter>
     </FxCompile>
-    <FxCompile Include="Content\Shaders\PSConstColor.hlsl">
-      <Filter>Shaders\Rendering</Filter>
-    </FxCompile>
     <FxCompile Include="Content\Shaders\VSParticle.hlsl">
       <Filter>Shaders\Particle</Filter>
     </FxCompile>
@@ -211,6 +208,9 @@
       <Filter>Shaders\Particle</Filter>
     </FxCompile>
     <FxCompile Include="Content\Shaders\DSParticle.hlsl">
+      <Filter>Shaders\Particle</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\PSParticle.hlsl">
       <Filter>Shaders\Particle</Filter>
     </FxCompile>
   </ItemGroup>

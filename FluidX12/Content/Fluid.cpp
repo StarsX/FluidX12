@@ -203,15 +203,14 @@ bool Fluid::createPipelineLayouts()
 		Util::PipelineLayout pipelineLayout;
 		pipelineLayout.SetConstants(0, SizeOfInUint32(CBPerFrame), 0, 0, Shader::Stage::VS);
 		pipelineLayout.SetConstants(1, SizeOfInUint32(XMMATRIX), 1, 0, Shader::Stage::VS);
-		pipelineLayout.SetConstants(2, SizeOfInUint32(XMMATRIX), 0, 0, Shader::Stage::DS);
+		pipelineLayout.SetConstants(2, SizeOfInUint32(XMMATRIX[2]), 0, 0, Shader::Stage::DS);
 		pipelineLayout.SetRange(3, DescriptorType::UAV, 1, 0, 0, DescriptorRangeFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
 		pipelineLayout.SetRange(3, DescriptorType::SRV, 1, 0);
-		pipelineLayout.SetRange(4, DescriptorType::SRV, 1, 1);
+		pipelineLayout.SetRange(4, DescriptorType::SRV, 1, 0);
 		pipelineLayout.SetRange(5, DescriptorType::SAMPLER, 1, 0);
 		pipelineLayout.SetShaderStage(2, Shader::Stage::DS);
 		pipelineLayout.SetShaderStage(3, Shader::Stage::VS);
-		pipelineLayout.SetShaderStage(4, Shader::Stage::VS);
-		pipelineLayout.SetShaderStage(5, Shader::Stage::VS);
+		pipelineLayout.SetShaderStage(4, Shader::Stage::DS);
 		X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
 			PipelineLayoutFlag::NONE, L"ParticleLayout"), false);
 	}
@@ -273,14 +272,13 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 	}
 
 	// Visualization
-	N_RETURN(m_shaderPool.CreateShader(Shader::Stage::VS, vsIndex, L"VSScreenQuad.cso"), false);
 	if (m_numParticles > 0)
 	{
 		// Particle rendering
 		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::VS, vsIndex, L"VSParticle.cso"), false);
 		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::HS, hsIndex, L"HSParticle.cso"), false);
 		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::DS, dsIndex, L"DSParticle.cso"), false);
-		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::PS, psIndex, L"PSConstColor.cso"), false);
+		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::PS, psIndex, L"PSParticle.cso"), false);
 
 		Graphics::State state;
 		state.SetPipelineLayout(m_pipelineLayouts[VISUALIZE]);
@@ -289,14 +287,17 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 		state.SetShader(Shader::Stage::DS, m_shaderPool.GetShader(Shader::Stage::DS, dsIndex++));
 		state.SetShader(Shader::Stage::PS, m_shaderPool.GetShader(Shader::Stage::PS, psIndex));
 		state.IASetPrimitiveTopologyType(PrimitiveTopologyType::PATCH);
+		state.DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache);
+		state.OMSetBlendState(Graphics::NON_PRE_MUL, m_graphicsPipelineCache);
 		state.OMSetNumRenderTargets(1);
 		state.OMSetRTVFormat(0, rtFormat);
-		state.OMSetDSVFormat(dsFormat);
+		//state.OMSetDSVFormat(dsFormat);
 		X_RETURN(m_pipelines[VISUALIZE], state.GetPipeline(m_graphicsPipelineCache, L"Particle"), false);
 	}
 	else if (m_gridSize.z > 1)
 	{
 		// Ray casting
+		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::VS, vsIndex, L"VSScreenQuad.cso"), false);
 		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::PS, psIndex, L"PSRayCast.cso"), false);
 
 		Graphics::State state;
@@ -312,6 +313,7 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 	else
 	{
 		// Visualization
+		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::VS, vsIndex, L"VSScreenQuad.cso"), false);
 		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::PS, psIndex, L"PSVisualizeColor.cso"), false);
 
 		Graphics::State state;
@@ -319,6 +321,7 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 		state.SetShader(Shader::Stage::VS, m_shaderPool.GetShader(Shader::Stage::VS, vsIndex));
 		state.SetShader(Shader::Stage::PS, m_shaderPool.GetShader(Shader::Stage::PS, psIndex++));
 		state.IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
+		state.OMSetBlendState(Graphics::NON_PRE_MUL, m_graphicsPipelineCache);
 		state.DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache);
 		state.OMSetRTVFormats(&rtFormat, 1);
 		X_RETURN(m_pipelines[VISUALIZE], state.GetPipeline(m_graphicsPipelineCache, L"Visualization"), false);
@@ -443,18 +446,21 @@ void Fluid::rayCast(const CommandList& commandList)
 void Fluid::renderParticles(const CommandList& commandList)
 {
 	// General matrices
-	XMMATRIX worldView, proj;
+	XMMATRIX worldView, worldViewI, proj;
 	if (m_gridSize.z > 1)
 	{
 		const auto world = getWorldMatrix();
-		worldView = XMMatrixTranspose(world * XMLoadFloat4x4(&m_view));
+		worldView = world * XMLoadFloat4x4(&m_view);
 		proj = XMMatrixTranspose(XMLoadFloat4x4(&m_proj));
+
 	}
 	else
 	{
 		worldView = getWorldMatrix();
 		proj = XMMatrixScaling(0.1f, 0.1f, 0.1f);
 	}
+	worldViewI = XMMatrixTranspose(XMMatrixInverse(nullptr, worldView));
+	worldView = XMMatrixTranspose(worldView);
 
 	// Set barrier
 	ResourceBarrier barrier;
@@ -470,8 +476,9 @@ void Fluid::renderParticles(const CommandList& commandList)
 	// Set descriptor tables
 	commandList.SetGraphics32BitConstant(0, reinterpret_cast<uint32_t&>(m_timeStep));
 	commandList.SetGraphics32BitConstant(0, rand(), SizeOfInUint32(m_timeStep));
-	commandList.SetGraphics32BitConstants(1, SizeOfInUint32(XMMATRIX), &worldView);
-	commandList.SetGraphics32BitConstants(2, SizeOfInUint32(XMMATRIX), &proj);
+	commandList.SetGraphics32BitConstants(1, SizeOfInUint32(worldView), &worldView);
+	commandList.SetGraphics32BitConstants(2, SizeOfInUint32(worldViewI), &worldViewI);
+	commandList.SetGraphics32BitConstants(2, SizeOfInUint32(proj), &proj, SizeOfInUint32(worldViewI));
 	commandList.SetGraphicsDescriptorTable(3, m_srvUavTables[UAV_SRV_TABLE_PARTICLE]);
 	commandList.SetGraphicsDescriptorTable(4, m_srvUavTables[SRV_UAV_TABLE_COLOR + !m_frameParity]);
 	commandList.SetGraphicsDescriptorTable(5, m_samplerTables[SAMPLER_TABLE_CLAMP]);

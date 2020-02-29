@@ -3,10 +3,9 @@
 //--------------------------------------------------------------------------------------
 
 // Input/output control point
-struct HSInOut
+struct HSIn
 {
-	float4 Pos		: POSITION;
-	float4 Color	: COLOR;
+	float4 Pos : POSITION;
 };
 
 // Output patch constant data.
@@ -17,12 +16,12 @@ struct HSConstDataOut
 };
 
 // Patch Constant Function
-HSConstDataOut CalcHSPatchConstants(InputPatch<HSInOut, 1> ip)
+HSConstDataOut CalcHSPatchConstants(InputPatch<HSIn, 1> ip)
 {
 	HSConstDataOut output;
 
 	// Output tess factors
-	const float tessFactor = 1.0;
+	const float tessFactor = 4.0;
 	output.EdgeTessFactor[0] = output.EdgeTessFactor[2] = tessFactor;
 	output.EdgeTessFactor[1] = output.EdgeTessFactor[3] = tessFactor;
 	output.InsideTessFactor[0] = output.InsideTessFactor[1] = tessFactor;
@@ -35,11 +34,9 @@ HSConstDataOut CalcHSPatchConstants(InputPatch<HSInOut, 1> ip)
 [outputtopology("triangle_cw")]
 [outputcontrolpoints(1)]
 [patchconstantfunc("CalcHSPatchConstants")]
-HSInOut main(InputPatch<HSInOut, 1> ip,
-	uint i : SV_OutputControlPointID)
+float4  main(InputPatch<HSIn, 1> ip,
+	uint i : SV_OutputControlPointID) : POSITION
 {
 	// Pass-through
-	HSInOut output = ip[i];
-
-	return output;
+	return ip[i].Pos;
 }

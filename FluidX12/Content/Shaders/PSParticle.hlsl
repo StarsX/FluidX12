@@ -2,29 +2,41 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
+#define PI 3.1415926535897
+
 //--------------------------------------------------------------------------------------
 // Structure
 //--------------------------------------------------------------------------------------
 struct PSIn
 {
-	float4 Pos : SV_POSITION;
-	float2 Tex : TEXCOORD;
+	float4 Pos		: SV_POSITION;
+	float4 Color	: COLOR;
+	float3 Nrm		: NORMAL;
+	float2 Tex		: TEXCOORD;
 };
 
-//--------------------------------------------------------------------------------------
-// Texture
-//--------------------------------------------------------------------------------------
-Texture3D		g_txSrc;
-
-//--------------------------------------------------------------------------------------
-// Texture sampler
-//--------------------------------------------------------------------------------------
-SamplerState	g_smpLinear;
-
-min16float4 main(PSIn input) : SV_TARGET
+float Wyvill(float x)
 {
-	min16float4 color = min16float4(g_txSrc.SampleLevel(g_smpLinear, float3(input.Tex, 0.5), 0.0));
-	color.xyz = sqrt(color.xyz);
-	
-	return saturate(color);
+	x = 1.0 - x;
+
+	return x * x * x;
+}
+
+//--------------------------------------------------------------------------------------
+// Pixel shader of particle rendering
+//--------------------------------------------------------------------------------------
+float4 main(PSIn input) : SV_TARGET
+{
+	// Clip shape
+	const float2 r = input.Tex - 0.5;
+	const float r_sq = dot(r, r);
+	//if (r_sq > 0.25) discard;
+
+	float4 color = input.Color;
+	const float lightAmt = saturate(dot(input.Nrm, normalize(float3(1.0, 1.0, -1.0))));
+	color.xyz = PI * color.xyz * (lightAmt + 0.16);
+
+	color.w *= Wyvill(4.0 * r_sq);
+
+	return float4(sqrt(color.xyz), saturate(color.w));
 }
