@@ -86,11 +86,12 @@ bool Fluid::Init(const CommandList& commandList, uint32_t width, uint32_t height
 	return true;
 }
 
-void Fluid::UpdateFrame(float timeStep, CXMMATRIX viewProj, const XMFLOAT3& eyePt)
+void Fluid::UpdateFrame(float timeStep, const XMFLOAT4X4& view, const XMFLOAT4X4& proj, const XMFLOAT3& eyePt)
 {
 	m_timeStep = timeStep;
 	if (timeStep > 0.0) m_frameParity = !m_frameParity;
-	XMStoreFloat4x4(&m_viewProj, viewProj);
+	m_view = view;
+	m_proj = proj;
 	m_eyePt = eyePt;
 }
 
@@ -202,13 +203,15 @@ bool Fluid::createPipelineLayouts()
 		Util::PipelineLayout pipelineLayout;
 		pipelineLayout.SetConstants(0, SizeOfInUint32(CBPerFrame), 0, 0, Shader::Stage::VS);
 		pipelineLayout.SetConstants(1, SizeOfInUint32(XMMATRIX), 1, 0, Shader::Stage::VS);
-		pipelineLayout.SetRange(2, DescriptorType::UAV, 1, 0, 0, DescriptorRangeFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
-		pipelineLayout.SetRange(2, DescriptorType::SRV, 1, 0);
-		pipelineLayout.SetRange(3, DescriptorType::SRV, 1, 1);
-		pipelineLayout.SetRange(4, DescriptorType::SAMPLER, 1, 0);
-		pipelineLayout.SetShaderStage(2, Shader::Stage::VS);
+		pipelineLayout.SetConstants(2, SizeOfInUint32(XMMATRIX), 0, 0, Shader::Stage::DS);
+		pipelineLayout.SetRange(3, DescriptorType::UAV, 1, 0, 0, DescriptorRangeFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
+		pipelineLayout.SetRange(3, DescriptorType::SRV, 1, 0);
+		pipelineLayout.SetRange(4, DescriptorType::SRV, 1, 1);
+		pipelineLayout.SetRange(5, DescriptorType::SAMPLER, 1, 0);
+		pipelineLayout.SetShaderStage(2, Shader::Stage::DS);
 		pipelineLayout.SetShaderStage(3, Shader::Stage::VS);
 		pipelineLayout.SetShaderStage(4, Shader::Stage::VS);
+		pipelineLayout.SetShaderStage(5, Shader::Stage::VS);
 		X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout.GetPipelineLayout(m_pipelineLayoutCache,
 			PipelineLayoutFlag::NONE, L"ParticleLayout"), false);
 	}
@@ -243,6 +246,8 @@ bool Fluid::createPipelineLayouts()
 bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 {
 	auto vsIndex = 0u;
+	auto hsIndex = 0u;
+	auto dsIndex = 0u;
 	auto psIndex = 0u;
 	auto csIndex = 0u;
 
@@ -273,13 +278,17 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 	{
 		// Particle rendering
 		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::VS, vsIndex, L"VSParticle.cso"), false);
+		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::HS, hsIndex, L"HSParticle.cso"), false);
+		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::DS, dsIndex, L"DSParticle.cso"), false);
 		N_RETURN(m_shaderPool.CreateShader(Shader::Stage::PS, psIndex, L"PSConstColor.cso"), false);
 
 		Graphics::State state;
 		state.SetPipelineLayout(m_pipelineLayouts[VISUALIZE]);
 		state.SetShader(Shader::Stage::VS, m_shaderPool.GetShader(Shader::Stage::VS, vsIndex++));
+		state.SetShader(Shader::Stage::HS, m_shaderPool.GetShader(Shader::Stage::HS, hsIndex++));
+		state.SetShader(Shader::Stage::DS, m_shaderPool.GetShader(Shader::Stage::DS, dsIndex++));
 		state.SetShader(Shader::Stage::PS, m_shaderPool.GetShader(Shader::Stage::PS, psIndex));
-		state.IASetPrimitiveTopologyType(PrimitiveTopologyType::POINT);
+		state.IASetPrimitiveTopologyType(PrimitiveTopologyType::PATCH);
 		state.OMSetNumRenderTargets(1);
 		state.OMSetRTVFormat(0, rtFormat);
 		state.OMSetDSVFormat(dsFormat);
@@ -396,8 +405,9 @@ void Fluid::visualizeColor(const CommandList& commandList)
 void Fluid::rayCast(const CommandList& commandList)
 {
 	// General matrices
-	XMMATRIX worldViewProj, worldI;
-	generateMatrices(worldViewProj, &worldI);
+	const auto world = getWorldMatrix();
+	const auto worldViewProj = world * XMLoadFloat4x4(&m_view) * XMLoadFloat4x4(&m_proj);
+	const auto worldI = XMMatrixInverse(nullptr, world);
 
 	// Screen space matrices
 	CBPerObject cbPerObject;
@@ -433,13 +443,18 @@ void Fluid::rayCast(const CommandList& commandList)
 void Fluid::renderParticles(const CommandList& commandList)
 {
 	// General matrices
-	XMMATRIX worldViewProj;
+	XMMATRIX worldView, proj;
 	if (m_gridSize.z > 1)
 	{
-		generateMatrices(worldViewProj);
-		worldViewProj = XMMatrixTranspose(worldViewProj);
+		const auto world = getWorldMatrix();
+		worldView = XMMatrixTranspose(world * XMLoadFloat4x4(&m_view));
+		proj = XMMatrixTranspose(XMLoadFloat4x4(&m_proj));
 	}
-	else worldViewProj = XMMatrixIdentity();
+	else
+	{
+		worldView = getWorldMatrix();
+		proj = XMMatrixScaling(0.1f, 0.1f, 0.1f);
+	}
 
 	// Set barrier
 	ResourceBarrier barrier;
@@ -450,22 +465,21 @@ void Fluid::renderParticles(const CommandList& commandList)
 	commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[VISUALIZE]);
 	commandList.SetPipelineState(m_pipelines[VISUALIZE]);
 
-	commandList.IASetPrimitiveTopology(PrimitiveTopology::POINTLIST);
+	commandList.IASetPrimitiveTopology(PrimitiveTopology::CONTROL_POINT1_PATCHLIST);
 
 	// Set descriptor tables
 	commandList.SetGraphics32BitConstant(0, reinterpret_cast<uint32_t&>(m_timeStep));
 	commandList.SetGraphics32BitConstant(0, rand(), SizeOfInUint32(m_timeStep));
-	commandList.SetGraphics32BitConstants(1, SizeOfInUint32(XMMATRIX), &worldViewProj);
-	commandList.SetGraphicsDescriptorTable(2, m_srvUavTables[UAV_SRV_TABLE_PARTICLE]);
-	commandList.SetGraphicsDescriptorTable(3, m_srvUavTables[SRV_UAV_TABLE_COLOR + !m_frameParity]);
-	commandList.SetGraphicsDescriptorTable(4, m_samplerTables[SAMPLER_TABLE_CLAMP]);
+	commandList.SetGraphics32BitConstants(1, SizeOfInUint32(XMMATRIX), &worldView);
+	commandList.SetGraphics32BitConstants(2, SizeOfInUint32(XMMATRIX), &proj);
+	commandList.SetGraphicsDescriptorTable(3, m_srvUavTables[UAV_SRV_TABLE_PARTICLE]);
+	commandList.SetGraphicsDescriptorTable(4, m_srvUavTables[SRV_UAV_TABLE_COLOR + !m_frameParity]);
+	commandList.SetGraphicsDescriptorTable(5, m_samplerTables[SAMPLER_TABLE_CLAMP]);
 
 	commandList.Draw(m_numParticles, 1, 0, 0);
 }
 
-void Fluid::generateMatrices(XMMATRIX& worldViewProj, XMMATRIX* pWorldI) const
+XMMATRIX Fluid::getWorldMatrix() const
 {
-	const auto world = XMMatrixScaling(10.0f, 10.0f, 10.0f);
-	worldViewProj = world * XMLoadFloat4x4(&m_viewProj);
-	if (pWorldI) *pWorldI = XMMatrixInverse(nullptr, world);
+	return XMMatrixScaling(10.0f, 10.0f, 10.0f);
 }

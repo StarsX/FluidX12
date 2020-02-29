@@ -2,8 +2,6 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
-//#include "SharedConst.h"
-
 #define NUM_SAMPLES			128
 #define NUM_LIGHT_SAMPLES	32
 #define ABSORPTION			1.0
@@ -28,12 +26,12 @@ static const min16float g_lightStepScale = g_maxDist / NUM_LIGHT_SAMPLES;
 static const min16float3 g_clearColor = 0.0;
 
 //--------------------------------------------------------------------------------------
-// Textures
+// Texture
 //--------------------------------------------------------------------------------------
 Texture3D<float4>	g_txGrid;
 
 //--------------------------------------------------------------------------------------
-// Unordered access textures
+// Unordered access texture
 //--------------------------------------------------------------------------------------
 RWTexture2D<float4>	g_rwPresent;
 

@@ -8,7 +8,7 @@
 #define PI 3.1415926535897
 
 //--------------------------------------------------------------------------------------
-// Struct
+// Structures
 //--------------------------------------------------------------------------------------
 struct Particle
 {
@@ -19,7 +19,7 @@ struct Particle
 
 struct VSOut
 {
-	float4 Pos		: SV_POSITION;
+	float4 Pos		: POSITION;
 	float4 Color	: COLOR;
 };
 
@@ -28,13 +28,13 @@ struct VSOut
 //--------------------------------------------------------------------------------------
 cbuffer cbPerObject
 {
-	matrix g_worldViewProj;
+	matrix g_worldView;
 };
 
 static const float g_fullLife = 2.0;
 
 //--------------------------------------------------------------------------------------
-// Buffer and texture
+// Buffer and textures
 //--------------------------------------------------------------------------------------
 RWStructuredBuffer<Particle> g_rwParticles;
 Texture3D<float3>	g_txVelocity;
@@ -178,7 +178,7 @@ VSOut main(uint ParticleId : SV_VERTEXID)
 
 	const float lightAmt = saturate(dot(nrm, normalize(float3(1.0, 1.0, -1.0))));
 
-	output.Pos = mul(float4(pos, 1.0), g_worldViewProj);
+	output.Pos = mul(float4(pos, 1.0), g_worldView);
 	output.Color.xyz = PI * color.xyz * (lightAmt + 0.16);
 	output.Color.w = color.w;
 

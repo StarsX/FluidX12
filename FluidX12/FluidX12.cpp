@@ -202,10 +202,10 @@ void FluidX::OnUpdate()
 
 	// View
 	//const auto eyePt = XMLoadFloat3(&m_eyePt);
-	const auto view = XMLoadFloat4x4(&m_view);
-	const auto proj = XMLoadFloat4x4(&m_proj);
-	const auto viewProj = view * proj;
-	m_fluid->UpdateFrame(timeStep, viewProj, m_eyePt);
+	//const auto view = XMLoadFloat4x4(&m_view);
+	//const auto proj = XMLoadFloat4x4(&m_proj);
+	//const auto viewProj = view * proj;
+	m_fluid->UpdateFrame(timeStep, m_view, m_proj, m_eyePt);
 }
 
 // Render the scene.

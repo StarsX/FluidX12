@@ -18,7 +18,8 @@ public:
 		std::vector<XUSG::Resource>& uploaders, XUSG::Format rtFormat, XUSG::Format dsFormat,
 		const DirectX::XMUINT3& gridSize, uint32_t numParticles = 0);
 
-	void UpdateFrame(float timeStep, DirectX::CXMMATRIX viewProj, const DirectX::XMFLOAT3& eyePt);
+	void UpdateFrame(float timeStep, const DirectX::XMFLOAT4X4& view,
+		const DirectX::XMFLOAT4X4& proj, const DirectX::XMFLOAT3& eyePt);
 	void Simulate(const XUSG::CommandList& commandList);
 	void Render(const XUSG::CommandList& commandList);
 
@@ -66,7 +67,8 @@ protected:
 	void visualizeColor(const XUSG::CommandList& commandList);
 	void rayCast(const XUSG::CommandList& commandList);
 	void renderParticles(const XUSG::CommandList& commandList);
-	void generateMatrices(DirectX::XMMATRIX& worldViewProj, DirectX::XMMATRIX* pWorldI = nullptr) const;
+
+	DirectX::XMMATRIX getWorldMatrix() const;
 
 	XUSG::Device m_device;
 
@@ -89,7 +91,8 @@ protected:
 
 	DirectX::XMUINT3		m_gridSize;
 	DirectX::XMUINT2		m_viewport;
-	DirectX::XMFLOAT4X4		m_viewProj;
+	DirectX::XMFLOAT4X4		m_view;
+	DirectX::XMFLOAT4X4		m_proj;
 	DirectX::XMFLOAT3		m_eyePt;
 
 	float					m_timeStep;
