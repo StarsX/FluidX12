@@ -25,7 +25,7 @@ cbuffer cbPerObject
 	matrix g_worldView;
 };
 
-static const float g_fullLife = 2.0;
+static const float g_fullLife = 3.0;
 
 //--------------------------------------------------------------------------------------
 // Buffer and textures
