@@ -47,17 +47,17 @@ private:
 
 	std::shared_ptr<XUSG::DescriptorTableCache> m_descriptorTableCache;
 
-	XUSG::SwapChain			m_swapChain;
-	XUSG::CommandAllocator	m_commandAllocators[FrameCount];
-	XUSG::CommandQueue		m_commandQueue;
+	XUSG::SwapChain				m_swapChain;
+	XUSG::CommandAllocator		m_commandAllocators[FrameCount];
+	XUSG::CommandQueue			m_commandQueue;
 
-	XUSG::Device			m_device;
-	XUSG::RenderTarget		m_renderTargets[FrameCount];
-	XUSG::CommandList		m_commandList;
+	XUSG::Device				m_device;
+	XUSG::RenderTarget::uptr	m_renderTargets[FrameCount];
+	XUSG::CommandList::uptr		m_commandList;
 
 	// App resources.
-	std::unique_ptr<Fluid>	m_fluid;
-	XUSG::DepthStencil		m_depth;
+	std::unique_ptr<Fluid>		m_fluid;
+	XUSG::DepthStencil::uptr	m_depth;
 	XMFLOAT4X4	m_proj;
 	XMFLOAT4X4	m_view;
 	XMFLOAT3	m_focusPt;
