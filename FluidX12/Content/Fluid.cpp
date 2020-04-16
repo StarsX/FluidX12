@@ -340,56 +340,56 @@ bool Fluid::createDescriptorTables()
 	if (m_numParticles > 0)
 	{
 		// Create particle UAV
-		const auto uavTable = Util::DescriptorTable::MakeUnique();
-		uavTable->SetDescriptors(0, 1, &m_particleBuffer->GetUAV());
-		X_RETURN(m_srvUavTables[UAV_SRV_TABLE_PARTICLE], uavTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+		descriptorTable->SetDescriptors(0, 1, &m_particleBuffer->GetUAV());
+		X_RETURN(m_srvUavTables[UAV_SRV_TABLE_PARTICLE], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
 	}
 
 	// Create SRV and UAV tables
 	for (auto i = 0ui8; i < 2; ++i)
 	{
-		const auto srvUavTable = Util::DescriptorTable::MakeUnique();
+		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		const Descriptor descriptors[] =
 		{
 			m_velocities[i]->GetSRV(),
 			m_velocities[(i + 1) % 2]->GetUAV()
 		};
-		srvUavTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-		X_RETURN(m_srvUavTables[SRV_UAV_TABLE_VECOLITY + i], srvUavTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
+		X_RETURN(m_srvUavTables[SRV_UAV_TABLE_VECOLITY + i], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
 	}
 
 	{
 		// Create incompressibility UAV
-		const auto uavTable = Util::DescriptorTable::MakeUnique();
-		uavTable->SetDescriptors(0, 1, &m_incompress->GetUAV());
-		X_RETURN(m_srvUavTables[UAV_TABLE_INCOMPRESS], uavTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+		descriptorTable->SetDescriptors(0, 1, &m_incompress->GetUAV());
+		X_RETURN(m_srvUavTables[UAV_TABLE_INCOMPRESS], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
 	}
 
 	for (auto i = 0ui8; i < 2; ++i)
 	{
-		const auto srvUavTable = Util::DescriptorTable::MakeUnique();
+		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		const Descriptor descriptors[] =
 		{
 			m_colors[(i + 1) % 2]->GetSRV(),
 			m_colors[i]->GetUAV()
 		};
-		srvUavTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-		X_RETURN(m_srvUavTables[SRV_UAV_TABLE_COLOR + i], srvUavTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
+		X_RETURN(m_srvUavTables[SRV_UAV_TABLE_COLOR + i], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
 	}
 
 	// Create the samplers
 	{
-		const auto samplerTable = Util::DescriptorTable::MakeUnique();
+		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		const auto samplerLinearMirror = SamplerPreset::LINEAR_MIRROR;
-		samplerTable->SetSamplers(0, 1, &samplerLinearMirror, *m_descriptorTableCache);
-		X_RETURN(m_samplerTables[SAMPLER_TABLE_MIRROR], samplerTable->GetSamplerTable(*m_descriptorTableCache), false);
+		descriptorTable->SetSamplers(0, 1, &samplerLinearMirror, *m_descriptorTableCache);
+		X_RETURN(m_samplerTables[SAMPLER_TABLE_MIRROR], descriptorTable->GetSamplerTable(*m_descriptorTableCache), false);
 	}
 
 	{
-		const auto samplerTable = Util::DescriptorTable::MakeUnique();
+		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		const auto samplerLinearClamp = SamplerPreset::LINEAR_CLAMP;
-		samplerTable->SetSamplers(0, 1, &samplerLinearClamp, *m_descriptorTableCache);
-		X_RETURN(m_samplerTables[SAMPLER_TABLE_CLAMP], samplerTable->GetSamplerTable(*m_descriptorTableCache), false);
+		descriptorTable->SetSamplers(0, 1, &samplerLinearClamp, *m_descriptorTableCache);
+		X_RETURN(m_samplerTables[SAMPLER_TABLE_CLAMP], descriptorTable->GetSamplerTable(*m_descriptorTableCache), false);
 	}
 
 	return true;
