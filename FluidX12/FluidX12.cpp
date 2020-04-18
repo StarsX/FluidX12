@@ -143,21 +143,21 @@ void FluidX::LoadAssets()
 
 	// Create the command list.
 	m_commandList = CommandList::MakeUnique();
-	N_RETURN(m_device->GetCommandList(m_commandList->GetCommandList(), 0, CommandListType::DIRECT,
+	const auto pCommandList = m_commandList.get();
+	N_RETURN(m_device->GetCommandList(pCommandList, 0, CommandListType::DIRECT,
 		m_commandAllocators[m_frameIndex], nullptr), ThrowIfFailed(E_FAIL));
 
 	vector<Resource> uploaders(0);
 	// Create fast hybrid fluid simulator
 	m_fluid = make_unique<Fluid>(m_device);
 	if (!m_fluid) ThrowIfFailed(E_FAIL);
-	if (!m_fluid->Init(m_commandList.get(), m_width, m_height, m_descriptorTableCache, uploaders,
+	if (!m_fluid->Init(pCommandList, m_width, m_height, m_descriptorTableCache, uploaders,
 		Format::B8G8R8A8_UNORM, Format::D24_UNORM_S8_UINT, m_gridSize, m_numParticles))
 		ThrowIfFailed(E_FAIL);
 
 	// Close the command list and execute it to begin the initial GPU setup.
-	ThrowIfFailed(m_commandList->Close());
-	BaseCommandList* ppCommandLists[] = { m_commandList->GetCommandList().get() };
-	m_commandQueue->ExecuteCommandLists(static_cast<uint32_t>(size(ppCommandLists)), ppCommandLists);
+	ThrowIfFailed(pCommandList->Close());
+	m_commandQueue->SubmitCommandList(pCommandList);
 
 	// Create synchronization objects and wait until assets have been uploaded to the GPU.
 	{
@@ -218,8 +218,7 @@ void FluidX::OnRender()
 	PopulateCommandList();
 
 	// Execute the command list.
-	BaseCommandList* const ppCommandLists[] = { m_commandList->GetCommandList().get() };
-	m_commandQueue->ExecuteCommandLists(static_cast<uint32_t>(size(ppCommandLists)), ppCommandLists);
+	m_commandQueue->SubmitCommandList(m_commandList.get());
 
 	// Present the frame.
 	ThrowIfFailed(m_swapChain->Present(0, 0));
