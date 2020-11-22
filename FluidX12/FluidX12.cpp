@@ -310,7 +310,6 @@ void FluidX::OnMouseLeave()
 
 void FluidX::ParseCommandLineArgs(wchar_t* argv[], int argc)
 {
-	wstring_convert<codecvt_utf8<wchar_t>> converter;
 	DXFramework::ParseCommandLineArgs(argv, argc);
 
 	for (auto i = 1; i < argc; ++i)
