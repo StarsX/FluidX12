@@ -178,13 +178,11 @@ bool Fluid::createPipelineLayouts()
 	{
 		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
 		pipelineLayout->SetConstants(0, SizeOfInUint32(float), 0);
-		pipelineLayout->SetRange(1, DescriptorType::SRV, 1, 0, 0, DescriptorFlag::DESCRIPTORS_VOLATILE);
-		pipelineLayout->SetRange(1, DescriptorType::UAV, 1, 0, 0,
-			DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE | DescriptorFlag::DESCRIPTORS_VOLATILE);
+		pipelineLayout->SetRange(1, DescriptorType::SRV, 1, 0);
+		pipelineLayout->SetRange(1, DescriptorType::UAV, 1, 0, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
 		pipelineLayout->SetRange(2, DescriptorType::SAMPLER, 1, 0);
-		pipelineLayout->SetRange(3, DescriptorType::SRV, 1, 1, 0, DescriptorFlag::DESCRIPTORS_VOLATILE);
-		pipelineLayout->SetRange(3, DescriptorType::UAV, 1, 1, 0,
-			DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE | DescriptorFlag::DESCRIPTORS_VOLATILE);
+		pipelineLayout->SetRange(3, DescriptorType::SRV, 1, 1);
+		pipelineLayout->SetRange(3, DescriptorType::UAV, 1, 1, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
 		X_RETURN(m_pipelineLayouts[ADVECT], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
 			PipelineLayoutFlag::NONE, L"AdvectionLayout"), false);
 	}
@@ -193,9 +191,8 @@ bool Fluid::createPipelineLayouts()
 	{
 		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
 		pipelineLayout->SetConstants(0, SizeOfInUint32(float), 0);
-		pipelineLayout->SetRange(1, DescriptorType::SRV, 1, 0, 0, DescriptorFlag::DESCRIPTORS_VOLATILE);
-		pipelineLayout->SetRange(1, DescriptorType::UAV, 2, 0, 0,
-			DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE | DescriptorFlag::DESCRIPTORS_VOLATILE);
+		pipelineLayout->SetRange(1, DescriptorType::SRV, 1, 0);
+		pipelineLayout->SetRange(1, DescriptorType::UAV, 2, 0, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
 		X_RETURN(m_pipelineLayouts[PROJECT], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
 			PipelineLayoutFlag::NONE, L"ProjectionLayout"), false);
 	}
