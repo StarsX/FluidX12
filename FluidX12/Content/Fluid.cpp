@@ -41,7 +41,7 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 	m_numParticles = numParticles;
 
 	// Create resources
-	for (auto i = 0ui8; i < 2; ++i)
+	for (uint8_t i = 0; i < 2; ++i)
 	{
 		m_velocities[i] = Texture3D::MakeUnique();
 		N_RETURN(m_velocities[i]->Create(m_device, gridSize.x, gridSize.y, gridSize.z, Format::R16G16B16A16_FLOAT,
@@ -346,7 +346,7 @@ bool Fluid::createDescriptorTables()
 	}
 
 	// Create SRV and UAV tables
-	for (auto i = 0ui8; i < 2; ++i)
+	for (uint8_t i = 0; i < 2; ++i)
 	{
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		const Descriptor descriptors[] =
@@ -365,7 +365,7 @@ bool Fluid::createDescriptorTables()
 		X_RETURN(m_srvUavTables[UAV_TABLE_INCOMPRESS], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
 	}
 
-	for (auto i = 0ui8; i < 2; ++i)
+	for (uint8_t i = 0; i < 2; ++i)
 	{
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		const Descriptor descriptors[] =
