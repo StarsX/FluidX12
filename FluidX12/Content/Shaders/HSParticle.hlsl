@@ -5,7 +5,7 @@
 // Input/output control point
 struct HSIn
 {
-	float4 Pos : POSITION;
+	float3 Pos : POSITION;
 };
 
 // Output patch constant data.
@@ -34,7 +34,7 @@ HSConstDataOut CalcHSPatchConstants(InputPatch<HSIn, 1> ip)
 [outputtopology("triangle_cw")]
 [outputcontrolpoints(1)]
 [patchconstantfunc("CalcHSPatchConstants")]
-float4  main(InputPatch<HSIn, 1> ip,
+float3  main(InputPatch<HSIn, 1> ip,
 	uint i : SV_OutputControlPointID) : POSITION
 {
 	// Pass-through

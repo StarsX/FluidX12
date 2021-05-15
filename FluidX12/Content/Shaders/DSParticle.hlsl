@@ -9,7 +9,7 @@
 //--------------------------------------------------------------------------------------
 struct DSIn
 {
-	float4 Pos : POSITION;
+	float3 Pos : POSITION;
 };
 
 struct DSOut
@@ -30,9 +30,10 @@ struct HSConstDataOut
 //--------------------------------------------------------------------------------------
 // Constants
 //--------------------------------------------------------------------------------------
-cbuffer cbPerFrame
+cbuffer cbPerObject : register (b1)
 {
-	matrix g_worldViewI;
+	float4x3 g_worldView;
+	float4x3 g_worldViewI;
 	matrix g_proj;
 };
 
@@ -102,7 +103,7 @@ DSOut main(HSConstDataOut input,
 	offset *= g_particleRadius;
 
 	// Caculate vertex position
-	float4 pos = patch[0].Pos;
+	float4 pos = float4(patch[0].Pos, 1.0);
 	pos.xy += offset;
 
 	// Sampling and calculate color and normal

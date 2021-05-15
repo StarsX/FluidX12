@@ -205,7 +205,7 @@ void FluidX::OnUpdate()
 	//const auto view = XMLoadFloat4x4(&m_view);
 	//const auto proj = XMLoadFloat4x4(&m_proj);
 	//const auto viewProj = view * proj;
-	m_fluid->UpdateFrame(timeStep, m_view, m_proj, m_eyePt);
+	m_fluid->UpdateFrame(timeStep, m_frameIndex, m_view, m_proj, m_eyePt);
 }
 
 // Render the scene.
@@ -351,7 +351,7 @@ void FluidX::PopulateCommandList()
 	pCommandList->SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
 
 	// Fluid simulation
-	m_fluid->Simulate(pCommandList);
+	m_fluid->Simulate(pCommandList, m_frameIndex);
 
 	ResourceBarrier barriers[1];
 	auto numBarriers = m_renderTargets[m_frameIndex]->SetBarrier(barriers, ResourceState::RENDER_TARGET);
@@ -370,7 +370,7 @@ void FluidX::PopulateCommandList()
 	pCommandList->RSSetViewports(1, &viewport);
 	pCommandList->RSSetScissorRects(1, &scissorRect);
 
-	m_fluid->Render(pCommandList);
+	m_fluid->Render(pCommandList, m_frameIndex);
 	
 	// Indicate that the back buffer will now be used to present.
 	numBarriers = m_renderTargets[m_frameIndex]->SetBarrier(barriers, ResourceState::PRESENT);

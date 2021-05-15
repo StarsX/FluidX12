@@ -6,9 +6,10 @@
 #pragma warning(disable:4250)
 
 #define VOID_RETURN
-#define C_RETURN(x, r)		if (x) return r
-#define N_RETURN(x, r)		C_RETURN(!(x), r)
-#define X_RETURN(x, f, r)	{ x = f; N_RETURN(x, r); }
+#define M_RETURN(x, o, m, r)	if (x) { o << m << std::endl; assert(!m); return r; }
+#define C_RETURN(x, r)			if (x) return r
+#define N_RETURN(x, r)			C_RETURN(!(x), r)
+#define X_RETURN(x, f, r)		{ x = f; N_RETURN(x, r); }
 
 #define DIV_UP(x, n)		(((x) - 1) / (n) + 1)
 #define SizeOfInUint32(obj)	DIV_UP(sizeof(obj), sizeof(uint32_t))
@@ -825,6 +826,7 @@ namespace XUSG
 
 		virtual const Resource& GetResource() const = 0;
 		virtual const Descriptor& GetCBV(uint32_t index = 0) const = 0;
+		virtual uint32_t GetCBVOffset(uint32_t index) const = 0;
 
 		using uptr = std::unique_ptr<ConstantBuffer>;
 		using sptr = std::shared_ptr<ConstantBuffer>;
@@ -1409,8 +1411,7 @@ namespace XUSG
 				DescriptorFlag flags = DescriptorFlag::NONE, Shader::Stage stage = Shader::Stage::ALL) = 0;
 			virtual void SetRootUAV(uint32_t index, uint32_t binding, uint32_t space = 0,
 				DescriptorFlag flags = DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE, Shader::Stage stage = Shader::Stage::ALL) = 0;
-			virtual void SetRootCBV(uint32_t index, uint32_t binding, uint32_t space = 0,
-				DescriptorFlag flags = DescriptorFlag::DATA_STATIC, Shader::Stage stage = Shader::Stage::ALL) = 0;
+			virtual void SetRootCBV(uint32_t index, uint32_t binding, uint32_t space = 0, Shader::Stage stage = Shader::Stage::ALL) = 0;
 
 			virtual XUSG::PipelineLayout CreatePipelineLayout(PipelineLayoutCache& pipelineLayoutCache, PipelineLayoutFlag flags,
 				const wchar_t* name = nullptr) = 0;

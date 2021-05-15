@@ -18,10 +18,12 @@ public:
 		std::vector<XUSG::Resource>& uploaders, XUSG::Format rtFormat, XUSG::Format dsFormat,
 		const DirectX::XMUINT3& gridSize, uint32_t numParticles = 0);
 
-	void UpdateFrame(float timeStep, const DirectX::XMFLOAT4X4& view,
+	void UpdateFrame(float timeStep, uint8_t frameIndex, const DirectX::XMFLOAT4X4& view,
 		const DirectX::XMFLOAT4X4& proj, const DirectX::XMFLOAT3& eyePt);
-	void Simulate(const XUSG::CommandList* pCommandList);
-	void Render(const XUSG::CommandList* pCommandList);
+	void Simulate(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void Render(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
+
+	static const uint8_t FrameCount = 3;
 
 protected:
 	enum PipelineIndex : uint8_t
@@ -65,10 +67,8 @@ protected:
 	bool createDescriptorTables();
 
 	void visualizeColor(const XUSG::CommandList* pCommandList);
-	void rayCast(const XUSG::CommandList* pCommandList);
-	void renderParticles(const XUSG::CommandList* pCommandList);
-
-	DirectX::XMMATRIX getWorldMatrix() const;
+	void rayCast(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void renderParticles(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 
 	XUSG::Device m_device;
 
@@ -89,11 +89,11 @@ protected:
 	XUSG::Texture3D::uptr	m_colors[2];
 	XUSG::StructuredBuffer::uptr m_particleBuffer;
 
+	XUSG::ConstantBuffer::uptr m_cbPerFrame;
+	XUSG::ConstantBuffer::uptr m_cbPerObject;
+
 	DirectX::XMUINT3		m_gridSize;
 	DirectX::XMUINT2		m_viewport;
-	DirectX::XMFLOAT4X4		m_view;
-	DirectX::XMFLOAT4X4		m_proj;
-	DirectX::XMFLOAT3		m_eyePt;
 
 	float					m_timeStep;
 	float					m_timeInterval;

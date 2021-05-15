@@ -22,7 +22,7 @@ struct Particle
 //--------------------------------------------------------------------------------------
 cbuffer cbPerObject
 {
-	matrix g_worldView;
+	float4x3 g_worldView;
 };
 
 static const float g_fullLife = 3.0;
@@ -123,7 +123,7 @@ float3 SimulationToObjectSpace(float3 pos, bool is3D)
 //--------------------------------------------------------------------------------------
 // Vertex shader of particle integration or emission
 //--------------------------------------------------------------------------------------
-float4 main(uint ParticleId : SV_VERTEXID) : POSITION
+float3 main(uint ParticleId : SV_VERTEXID) : POSITION
 {
 	// Get grid size
 	float3 gridSize;
