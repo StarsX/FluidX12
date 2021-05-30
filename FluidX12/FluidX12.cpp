@@ -128,10 +128,6 @@ void FluidX::LoadPipeline()
 // Load the sample assets.
 void FluidX::LoadAssets()
 {
-	//const auto counter = RawBuffer::MakeUnique();
-	//N_RETURN(counter->Create(m_device.get(), sizeof(uint32_t), ResourceFlag::DENY_SHADER_RESOURCE,
-		//MemoryType::READBACK, 0, nullptr, 0), ThrowIfFailed(E_FAIL));
-
 	// Create the command list.
 	m_commandList = CommandList::MakeUnique();
 	const auto pCommandList = m_commandList.get();
