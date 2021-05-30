@@ -29,15 +29,15 @@ struct CBPerObjectGrid3D
 	XMMATRIX WorldViewProj;
 };
 
-Fluid::Fluid(const Device& device) :
+Fluid::Fluid(const Device::sptr& device) :
 	m_device(device),
 	m_timeInterval(0.0f),
 	m_frameParity(0)
 {
 	m_shaderPool = ShaderPool::MakeUnique();
-	m_graphicsPipelineCache = Graphics::PipelineCache::MakeUnique(device);
-	m_computePipelineCache = Compute::PipelineCache::MakeUnique(device);
-	m_pipelineLayoutCache = PipelineLayoutCache::MakeUnique(device);
+	m_graphicsPipelineCache = Graphics::PipelineCache::MakeUnique(device.get());
+	m_computePipelineCache = Compute::PipelineCache::MakeUnique(device.get());
+	m_pipelineLayoutCache = PipelineLayoutCache::MakeUnique(device.get());
 }
 
 Fluid::~Fluid()
@@ -45,7 +45,7 @@ Fluid::~Fluid()
 }
 
 bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
-	shared_ptr<DescriptorTableCache> descriptorTableCache, vector<Resource>& uploaders,
+	const DescriptorTableCache::sptr& descriptorTableCache, vector<Resource::uptr>& uploaders,
 	Format rtFormat, Format dsFormat, const XMUINT3& gridSize, uint32_t numParticles)
 {
 	m_viewport = XMUINT2(width, height);
@@ -57,37 +57,37 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 	for (uint8_t i = 0; i < 2; ++i)
 	{
 		m_velocities[i] = Texture3D::MakeUnique();
-		N_RETURN(m_velocities[i]->Create(m_device, gridSize.x, gridSize.y, gridSize.z, Format::R16G16B16A16_FLOAT,
+		N_RETURN(m_velocities[i]->Create(m_device.get(), gridSize.x, gridSize.y, gridSize.z, Format::R16G16B16A16_FLOAT,
 			i ? ResourceFlag::ALLOW_UNORDERED_ACCESS : (ResourceFlag::ALLOW_UNORDERED_ACCESS |
 				ResourceFlag::ALLOW_SIMULTANEOUS_ACCESS), 1, MemoryType::DEFAULT,
 				(L"Velocity" + to_wstring(i)).c_str()), false);
 
 		m_colors[i] = Texture3D::MakeUnique();
-		N_RETURN(m_colors[i]->Create(m_device, gridSize.x, gridSize.y, gridSize.z, Format::R16G16B16A16_FLOAT,
+		N_RETURN(m_colors[i]->Create(m_device.get(), gridSize.x, gridSize.y, gridSize.z, Format::R16G16B16A16_FLOAT,
 			ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryType::DEFAULT,
 			(L"Color" + to_wstring(i)).c_str()), false);
 	}
 
 	m_incompress = Texture3D::MakeUnique();
-	N_RETURN(m_incompress->Create(m_device, gridSize.x, gridSize.y, gridSize.z, Format::R32_FLOAT,
+	N_RETURN(m_incompress->Create(m_device.get(), gridSize.x, gridSize.y, gridSize.z, Format::R32_FLOAT,
 		ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryType::DEFAULT,
 		L"Incompressibility"), false);
 
 	// Create constant buffers
 	m_cbPerFrame = ConstantBuffer::MakeUnique();
-	N_RETURN(m_cbPerFrame->Create(m_device, sizeof(CBPerFrame[FrameCount]), FrameCount,
+	N_RETURN(m_cbPerFrame->Create(m_device.get(), sizeof(CBPerFrame[FrameCount]), FrameCount,
 		nullptr, MemoryType::UPLOAD, L"CBPerFrame"), false);
 
 	if (m_numParticles > 0)
 	{
 		m_cbPerObject = ConstantBuffer::MakeUnique();
-		N_RETURN(m_cbPerObject->Create(m_device, sizeof(CBPerObjectParticle[FrameCount]), FrameCount,
+		N_RETURN(m_cbPerObject->Create(m_device.get(), sizeof(CBPerObjectParticle[FrameCount]), FrameCount,
 			nullptr, MemoryType::UPLOAD, L"CBPerObject"), false);
 	}
 	else if (m_gridSize.z > 1)
 	{
 		m_cbPerObject = ConstantBuffer::MakeUnique();
-		N_RETURN(m_cbPerObject->Create(m_device, sizeof(CBPerObjectGrid3D[FrameCount]), FrameCount,
+		N_RETURN(m_cbPerObject->Create(m_device.get(), sizeof(CBPerObjectGrid3D[FrameCount]), FrameCount,
 			nullptr, MemoryType::UPLOAD, L"CBPerObject"), false);
 	}
 
@@ -98,7 +98,7 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 	if (numParticles > 0)
 	{
 		m_particleBuffer = StructuredBuffer::MakeUnique();
-		N_RETURN(m_particleBuffer->Create(m_device, numParticles, sizeof(ParticleInfo),
+		N_RETURN(m_particleBuffer->Create(m_device.get(), numParticles, sizeof(ParticleInfo),
 			ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT, 1, nullptr, 1,
 			nullptr, L"ParticleBuffer"), false);
 
@@ -109,8 +109,8 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 			particle.Pos.y = FLT_MAX;
 			particle.LifeTime = rand() % numParticles / 10000.0f;
 		}
-		uploaders.emplace_back();
-		m_particleBuffer->Upload(pCommandList, uploaders.back(), particles.data(),
+		uploaders.emplace_back(Resource::MakeUnique());
+		m_particleBuffer->Upload(pCommandList, uploaders.back().get(), particles.data(),
 			sizeof(ParticleInfo) * numParticles);
 	}
 
@@ -202,7 +202,7 @@ void Fluid::Simulate(const CommandList* pCommandList, uint8_t frameIndex)
 		pCommandList->SetPipelineState(m_pipelines[ADVECT]);
 
 		// Set descriptor tables
-		pCommandList->SetComputeRootConstantBufferView(0, m_cbPerFrame->GetResource(), m_cbPerFrame->GetCBVOffset(frameIndex));
+		pCommandList->SetComputeRootConstantBufferView(0, m_cbPerFrame.get(), m_cbPerFrame->GetCBVOffset(frameIndex));
 		pCommandList->SetComputeDescriptorTable(1, m_srvUavTables[SRV_UAV_TABLE_VECOLITY]);
 		pCommandList->SetComputeDescriptorTable(2, m_samplerTables[SAMPLER_TABLE_MIRROR]);
 		pCommandList->SetComputeDescriptorTable(3, m_srvUavTables[SRV_UAV_TABLE_COLOR + m_frameParity]);
@@ -224,7 +224,7 @@ void Fluid::Simulate(const CommandList* pCommandList, uint8_t frameIndex)
 		pCommandList->SetPipelineState(m_pipelines[PROJECT]);
 
 		// Set descriptor tables
-		pCommandList->SetComputeRootConstantBufferView(0, m_cbPerFrame->GetResource(), m_cbPerFrame->GetCBVOffset(frameIndex));
+		pCommandList->SetComputeRootConstantBufferView(0, m_cbPerFrame.get(), m_cbPerFrame->GetCBVOffset(frameIndex));
 		pCommandList->SetComputeDescriptorTable(1, m_srvUavTables[SRV_UAV_TABLE_VECOLITY1]);
 		
 		XMUINT3 numGroups;
@@ -263,7 +263,7 @@ bool Fluid::createPipelineLayouts()
 		pipelineLayout->SetRange(2, DescriptorType::SAMPLER, 1, 0);
 		pipelineLayout->SetRange(3, DescriptorType::SRV, 1, 1);
 		pipelineLayout->SetRange(3, DescriptorType::UAV, 1, 1, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
-		X_RETURN(m_pipelineLayouts[ADVECT], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_pipelineLayouts[ADVECT], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::NONE, L"AdvectionLayout"), false);
 	}
 
@@ -273,7 +273,7 @@ bool Fluid::createPipelineLayouts()
 		pipelineLayout->SetRootCBV(0, 0);
 		pipelineLayout->SetRange(1, DescriptorType::SRV, 1, 0);
 		pipelineLayout->SetRange(1, DescriptorType::UAV, 2, 0, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
-		X_RETURN(m_pipelineLayouts[PROJECT], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_pipelineLayouts[PROJECT], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::NONE, L"ProjectionLayout"), false);
 	}
 
@@ -289,7 +289,7 @@ bool Fluid::createPipelineLayouts()
 		pipelineLayout->SetRange(4, DescriptorType::SAMPLER, 1, 0);
 		pipelineLayout->SetShaderStage(2, Shader::Stage::VS);
 		pipelineLayout->SetShaderStage(3, Shader::Stage::DS);
-		X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::NONE, L"ParticleLayout"), false);
 	}
 	else if (m_gridSize.z > 1)
@@ -302,7 +302,7 @@ bool Fluid::createPipelineLayouts()
 		pipelineLayout->SetShaderStage(0, Shader::Stage::PS);
 		pipelineLayout->SetShaderStage(1, Shader::Stage::PS);
 		pipelineLayout->SetShaderStage(2, Shader::Stage::PS);
-		X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::NONE, L"RayCastingLayout"), false);
 	}
 	else
@@ -313,7 +313,7 @@ bool Fluid::createPipelineLayouts()
 		pipelineLayout->SetRange(1, DescriptorType::SAMPLER, 1, 0);
 		pipelineLayout->SetShaderStage(0, Shader::PS);
 		pipelineLayout->SetShaderStage(1, Shader::PS);
-		X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::NONE, L"VisualizationLayout"), false);
 	}
 
@@ -335,7 +335,7 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 		const auto state = Compute::State::MakeUnique();
 		state->SetPipelineLayout(m_pipelineLayouts[ADVECT]);
 		state->SetShader(m_shaderPool->GetShader(Shader::Stage::CS, csIndex++));
-		X_RETURN(m_pipelines[ADVECT], state->GetPipeline(*m_computePipelineCache, L"Advection"), false);
+		X_RETURN(m_pipelines[ADVECT], state->GetPipeline(m_computePipelineCache.get(), L"Advection"), false);
 	}
 
 	// Projection
@@ -346,7 +346,7 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 		const auto state = Compute::State::MakeUnique();
 		state->SetPipelineLayout(m_pipelineLayouts[PROJECT]);
 		state->SetShader(m_shaderPool->GetShader(Shader::Stage::CS, csIndex++));
-		X_RETURN(m_pipelines[PROJECT], state->GetPipeline(*m_computePipelineCache, L"Projection"), false);
+		X_RETURN(m_pipelines[PROJECT], state->GetPipeline(m_computePipelineCache.get(), L"Projection"), false);
 	}
 
 	// Visualization
@@ -365,12 +365,12 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 		state->SetShader(Shader::Stage::DS, m_shaderPool->GetShader(Shader::Stage::DS, dsIndex++));
 		state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, psIndex));
 		state->IASetPrimitiveTopologyType(PrimitiveTopologyType::PATCH);
-		state->DSSetState(Graphics::DEPTH_STENCIL_NONE, *m_graphicsPipelineCache);
-		state->OMSetBlendState(Graphics::NON_PRE_MUL, *m_graphicsPipelineCache);
+		state->DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache.get());
+		state->OMSetBlendState(Graphics::NON_PRE_MUL, m_graphicsPipelineCache.get());
 		state->OMSetNumRenderTargets(1);
 		state->OMSetRTVFormat(0, rtFormat);
 		//state->OMSetDSVFormat(dsFormat);
-		X_RETURN(m_pipelines[VISUALIZE], state->GetPipeline(*m_graphicsPipelineCache, L"Particle"), false);
+		X_RETURN(m_pipelines[VISUALIZE], state->GetPipeline(m_graphicsPipelineCache.get(), L"Particle"), false);
 	}
 	else if (m_gridSize.z > 1)
 	{
@@ -383,10 +383,10 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 		state->SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, vsIndex++));
 		state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, psIndex));
 		state->IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
-		state->DSSetState(Graphics::DEPTH_STENCIL_NONE, *m_graphicsPipelineCache);
-		state->OMSetBlendState(Graphics::NON_PRE_MUL, *m_graphicsPipelineCache);
+		state->DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache.get());
+		state->OMSetBlendState(Graphics::NON_PRE_MUL, m_graphicsPipelineCache.get());
 		state->OMSetRTVFormats(&rtFormat, 1);
-		X_RETURN(m_pipelines[VISUALIZE], state->GetPipeline(*m_graphicsPipelineCache, L"RayCasting"), false);
+		X_RETURN(m_pipelines[VISUALIZE], state->GetPipeline(m_graphicsPipelineCache.get(), L"RayCasting"), false);
 	}
 	else
 	{
@@ -399,10 +399,10 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 		state->SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, vsIndex));
 		state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, psIndex++));
 		state->IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
-		state->OMSetBlendState(Graphics::NON_PRE_MUL, *m_graphicsPipelineCache);
-		state->DSSetState(Graphics::DEPTH_STENCIL_NONE, *m_graphicsPipelineCache);
+		state->OMSetBlendState(Graphics::NON_PRE_MUL, m_graphicsPipelineCache.get());
+		state->DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache.get());
 		state->OMSetRTVFormats(&rtFormat, 1);
-		X_RETURN(m_pipelines[VISUALIZE], state->GetPipeline(*m_graphicsPipelineCache, L"Visualization"), false);
+		X_RETURN(m_pipelines[VISUALIZE], state->GetPipeline(m_graphicsPipelineCache.get(), L"Visualization"), false);
 	}
 
 	return true;
@@ -415,7 +415,7 @@ bool Fluid::createDescriptorTables()
 		// Create particle UAV
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0, 1, &m_particleBuffer->GetUAV());
-		X_RETURN(m_srvUavTables[UAV_SRV_TABLE_PARTICLE], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+		X_RETURN(m_srvUavTables[UAV_SRV_TABLE_PARTICLE], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 	}
 
 	// Create SRV and UAV tables
@@ -428,14 +428,14 @@ bool Fluid::createDescriptorTables()
 			m_velocities[(i + 1) % 2]->GetUAV()
 		};
 		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-		X_RETURN(m_srvUavTables[SRV_UAV_TABLE_VECOLITY + i], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+		X_RETURN(m_srvUavTables[SRV_UAV_TABLE_VECOLITY + i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 	}
 
 	{
 		// Create incompressibility UAV
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0, 1, &m_incompress->GetUAV());
-		X_RETURN(m_srvUavTables[UAV_TABLE_INCOMPRESS], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+		X_RETURN(m_srvUavTables[UAV_TABLE_INCOMPRESS], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 	}
 
 	for (uint8_t i = 0; i < 2; ++i)
@@ -447,22 +447,22 @@ bool Fluid::createDescriptorTables()
 			m_colors[i]->GetUAV()
 		};
 		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-		X_RETURN(m_srvUavTables[SRV_UAV_TABLE_COLOR + i], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+		X_RETURN(m_srvUavTables[SRV_UAV_TABLE_COLOR + i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 	}
 
 	// Create the samplers
 	{
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		const auto samplerLinearMirror = SamplerPreset::LINEAR_MIRROR;
-		descriptorTable->SetSamplers(0, 1, &samplerLinearMirror, *m_descriptorTableCache);
-		X_RETURN(m_samplerTables[SAMPLER_TABLE_MIRROR], descriptorTable->GetSamplerTable(*m_descriptorTableCache), false);
+		descriptorTable->SetSamplers(0, 1, &samplerLinearMirror, m_descriptorTableCache.get());
+		X_RETURN(m_samplerTables[SAMPLER_TABLE_MIRROR], descriptorTable->GetSamplerTable(m_descriptorTableCache.get()), false);
 	}
 
 	{
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		const auto samplerLinearClamp = SamplerPreset::LINEAR_CLAMP;
-		descriptorTable->SetSamplers(0, 1, &samplerLinearClamp, *m_descriptorTableCache);
-		X_RETURN(m_samplerTables[SAMPLER_TABLE_CLAMP], descriptorTable->GetSamplerTable(*m_descriptorTableCache), false);
+		descriptorTable->SetSamplers(0, 1, &samplerLinearClamp, m_descriptorTableCache.get());
+		X_RETURN(m_samplerTables[SAMPLER_TABLE_CLAMP], descriptorTable->GetSamplerTable(m_descriptorTableCache.get()), false);
 	}
 
 	return true;
@@ -492,7 +492,7 @@ void Fluid::rayCast(const CommandList* pCommandList, uint8_t frameIndex)
 	pCommandList->IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);
 
 	// Set descriptor tables
-	pCommandList->SetGraphicsRootConstantBufferView(0, m_cbPerObject->GetResource(), m_cbPerObject->GetCBVOffset(frameIndex));
+	pCommandList->SetGraphicsRootConstantBufferView(0, m_cbPerObject.get(), m_cbPerObject->GetCBVOffset(frameIndex));
 	pCommandList->SetGraphicsDescriptorTable(1, m_srvUavTables[SRV_UAV_TABLE_COLOR + !m_frameParity]);
 	pCommandList->SetGraphicsDescriptorTable(2, m_samplerTables[SAMPLER_TABLE_CLAMP]);
 
@@ -513,8 +513,8 @@ void Fluid::renderParticles(const CommandList* pCommandList, uint8_t frameIndex)
 	pCommandList->IASetPrimitiveTopology(PrimitiveTopology::CONTROL_POINT1_PATCHLIST);
 
 	// Set descriptor tables
-	pCommandList->SetGraphicsRootConstantBufferView(0, m_cbPerFrame->GetResource(), m_cbPerFrame->GetCBVOffset(frameIndex));
-	pCommandList->SetGraphicsRootConstantBufferView(1, m_cbPerObject->GetResource(), m_cbPerObject->GetCBVOffset(frameIndex));
+	pCommandList->SetGraphicsRootConstantBufferView(0, m_cbPerFrame.get(), m_cbPerFrame->GetCBVOffset(frameIndex));
+	pCommandList->SetGraphicsRootConstantBufferView(1, m_cbPerObject.get(), m_cbPerObject->GetCBVOffset(frameIndex));
 	pCommandList->SetGraphicsDescriptorTable(2, m_srvUavTables[UAV_SRV_TABLE_PARTICLE]);
 	pCommandList->SetGraphicsDescriptorTable(3, m_srvUavTables[SRV_UAV_TABLE_COLOR + !m_frameParity]);
 	pCommandList->SetGraphicsDescriptorTable(4, m_samplerTables[SAMPLER_TABLE_CLAMP]);

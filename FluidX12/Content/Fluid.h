@@ -10,12 +10,12 @@
 class Fluid
 {
 public:
-	Fluid(const XUSG::Device& device);
+	Fluid(const XUSG::Device::sptr& device);
 	virtual ~Fluid();
 
 	bool Init(XUSG::CommandList* pCommandList, uint32_t width, uint32_t height,
-		std::shared_ptr<XUSG::DescriptorTableCache> descriptorTableCache,
-		std::vector<XUSG::Resource>& uploaders, XUSG::Format rtFormat, XUSG::Format dsFormat,
+		const XUSG::DescriptorTableCache::sptr& descriptorTableCache,
+		std::vector<XUSG::Resource::uptr>& uploaders, XUSG::Format rtFormat, XUSG::Format dsFormat,
 		const DirectX::XMUINT3& gridSize, uint32_t numParticles = 0);
 
 	void UpdateFrame(float timeStep, uint8_t frameIndex, const DirectX::XMFLOAT4X4& view,
@@ -70,7 +70,7 @@ protected:
 	void rayCast(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	void renderParticles(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 
-	XUSG::Device m_device;
+	XUSG::Device::sptr m_device;
 
 	XUSG::ShaderPool::uptr				m_shaderPool;
 	XUSG::Graphics::PipelineCache::uptr	m_graphicsPipelineCache;
