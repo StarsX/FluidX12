@@ -21,8 +21,9 @@ public:
 	void UpdateFrame(float timeStep, uint8_t frameIndex, const DirectX::XMFLOAT4X4& view,
 		const DirectX::XMFLOAT4X4& proj, const DirectX::XMFLOAT3& eyePt);
 	void Simulate(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
-	void Render(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
-
+	void Render(const XUSG::CommandList* pCommandList, uint8_t frameIndex, bool splitLightPass);
+	void RayMarchL(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void RayMarchV(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	static const uint8_t FrameCount = 3;
 
 protected:
@@ -31,6 +32,8 @@ protected:
 		ADVECT,
 		PROJECT,
 		VISUALIZE,
+		RAY_MARCH_L,
+		RAY_MARCH_V,
 
 		NUM_PIPELINE
 	};
@@ -43,6 +46,11 @@ protected:
 		SRV_UAV_TABLE_COLOR1,
 		UAV_TABLE_INCOMPRESS,
 		UAV_SRV_TABLE_PARTICLE,
+		SRV_UAV_TABLE_COLOR_LIGHT_MAP,
+		SRV_UAV_TABLE_COLOR_LIGHT_MAP1,
+
+		SRV_TABLE_COLOR_LIGHT_MAP,
+		SRV_TABLE_COLOR_LIGHT_MAP1,
 
 		NUM_SRV_UAV_TABLE
 	};
@@ -83,20 +91,29 @@ protected:
 
 	XUSG::DescriptorTable	m_srvUavTables[NUM_SRV_UAV_TABLE];
 	XUSG::DescriptorTable	m_samplerTables[NUM_SAMPLER_TABLE];
+	XUSG::DescriptorTable	m_cbvTables[FrameCount];
 
 	XUSG::Texture3D::uptr	m_incompress;
 	XUSG::Texture3D::uptr	m_velocities[2];
 	XUSG::Texture3D::uptr	m_colors[2];
+	XUSG::Texture3D::uptr	m_lightMap;
 	XUSG::StructuredBuffer::uptr m_particleBuffer;
 
 	XUSG::ConstantBuffer::uptr m_cbPerFrame;
 	XUSG::ConstantBuffer::uptr m_cbPerObject;
 
+	DirectX::XMFLOAT3		m_lightPt;
+	DirectX::XMFLOAT4		m_lightColor;
+	DirectX::XMFLOAT4		m_ambient;
 	DirectX::XMUINT3		m_gridSize;
 	DirectX::XMUINT2		m_viewport;
+	DirectX::XMFLOAT4X4		m_volumeWorld;
+	DirectX::XMFLOAT4X4		m_lightMapWorld;
 
 	float					m_timeStep;
 	float					m_timeInterval;
 	uint8_t					m_frameParity;
 	uint32_t				m_numParticles;
+
+	DirectX::XMUINT3					m_lightGridSize;
 };

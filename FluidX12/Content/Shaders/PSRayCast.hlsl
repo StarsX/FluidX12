@@ -2,51 +2,29 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
-#define NUM_SAMPLES			128
-#define NUM_LIGHT_SAMPLES	32
-#define ABSORPTION			1.0
-#define ZERO_THRESHOLD		0.01
-#define ONE_THRESHOLD		0.999
+#ifndef _LIGHT_PASS_
+#include "RayMarch.hlsli"
+#endif
 
-//--------------------------------------------------------------------------------------
-// Constant buffers
-//--------------------------------------------------------------------------------------
-cbuffer cbPerObject
+struct PSIn
 {
-	float3	g_localSpaceLightPt;
-	float3	g_localSpaceEyePt;
-	matrix	g_screenToLocal;
-	matrix	g_worldViewProj;
+	float4 Pos : SV_POSITION;
+	float2 Tex : TEXCOORD;
 };
 
-static const min16float g_maxDist = 2.0 * sqrt(3.0);
 static const min16float g_stepScale = g_maxDist / NUM_SAMPLES;
 static const min16float g_lightStepScale = g_maxDist / NUM_LIGHT_SAMPLES;
 
-static const min16float3 g_clearColor = 0.0;
-
-//--------------------------------------------------------------------------------------
-// Texture
-//--------------------------------------------------------------------------------------
-Texture3D<float4>	g_txGrid;
-
-//--------------------------------------------------------------------------------------
-// Unordered access texture
-//--------------------------------------------------------------------------------------
-RWTexture2D<float4>	g_rwPresent;
-
-//--------------------------------------------------------------------------------------
-// Texture samplers
-//--------------------------------------------------------------------------------------
-SamplerState		g_smpLinear;
-
-//--------------------------------------------------------------------------------------
 // Screen space to loacal space
 //--------------------------------------------------------------------------------------
-float3 ScreenToLocal(float3 screenPos)
+float3 TexcoordToLocalPos(float2 tex)
 {
-	float4 pos = mul(float4(screenPos, 1.0), g_screenToLocal);
-	
+	float4 pos;
+	pos.xy = tex * 2.0 - 1.0;
+	pos.zw = float2(0.0, 1.0);
+	pos.y = -pos.y;
+	pos = mul(pos, g_worldViewProjI);
+
 	return pos.xyz / pos.w;
 }
 
@@ -82,45 +60,64 @@ bool ComputeStartPoint(inout float3 pos, float3 rayDir)
 	return isHit;
 }
 
-//--------------------------------------------------------------------------------------
-// Sample density field
-//--------------------------------------------------------------------------------------
-min16float4 GetSample(float3 tex)
+#ifndef _LIGHT_PASS_
+float3 GetLight(float3 pos, float3 step)
 {
-	min16float4 color = min16float4(g_txGrid.SampleLevel(g_smpLinear, tex, 0.0));
-	color.w *= 24.0;
+	min16float shadow = 1.0;	// Transmittance along light ray
 
-	return min(min16float4(color.xyz * color.w, color.w), 24.0);
+	for (uint i = 0; i < NUM_LIGHT_SAMPLES; ++i)
+	{
+		// Update position along light ray
+		pos += step;
+		if (any(abs(pos) > 1.0)) break;
+		float3 tex = pos * min16float3(0.5, -0.5, 0.5) + 0.5;
+
+		// Get a sample along light ray
+		const min16float density = GetSample(tex).w;
+
+		// Attenuate ray-throughput along light direction
+		shadow *= saturate(1.0 - GetOpacity(density, g_lightStepScale));
+		if (shadow < ZERO_THRESHOLD) break;
+	}
+
+	return float3(shadow, shadow, shadow);
 }
+#endif
 
 //--------------------------------------------------------------------------------------
 // Pixel Shader
 //--------------------------------------------------------------------------------------
-min16float4 main(float4 sspos : SV_POSITION) : SV_TARGET
+min16float4 main(PSIn input) : SV_TARGET
 {
-	float3 pos = ScreenToLocal(float3(sspos.xy, 0.0));	// The point on the near plane
-	const float3 rayDir = normalize(pos - g_localSpaceEyePt);
-	if (!ComputeStartPoint(pos, rayDir)) discard;
+	float3 rayOrigin = TexcoordToLocalPos(input.Tex);		// The point on the near plane
+
+	const float3 localSpaceEyePt = mul(g_eyePos, g_worldI).xyz;
+	const float3 rayDir = normalize(rayOrigin - localSpaceEyePt);
+	if (!ComputeStartPoint(rayOrigin, rayDir)) discard;
 
 	const float3 step = rayDir * g_stepScale;
 
-#ifndef _POINT_LIGHT_
-	const float3 lightStep = normalize(g_localSpaceLightPt) * g_lightStepScale;
+#ifdef _POINT_LIGHT_
+	const float3 localSpaceLightPt = mul(g_lightPos, g_worldI).xyz;
+#else
+	const float3 localSpaceLightPt = mul(g_lightPos.xyz, (float3x3)g_worldI);
+	const float3 lightStep = normalize(localSpaceLightPt) * g_lightStepScale;
 #endif
 
 	// Transmittance
 	min16float transmit = 1.0;
 	// In-scattered radiance
-	min16float3 scatter = 0.0;
 	min16float3 ambient = 0.0;
-
+	min16float3 scatter = 0.0;
+	float t = 0.0;
 	for (uint i = 0; i < NUM_SAMPLES; ++i)
 	{
+		const float3 pos = rayOrigin + rayDir * t;
 		if (any(abs(pos) > 1.0)) break;
 		float3 tex = float3(0.5, -0.5, 0.5) * pos + 0.5;
 
 		// Get a sample
-		const min16float4 color = GetSample(tex);
+		min16float4 color = GetSample(tex);
 
 		// Skip empty space
 		if (color.w > ZERO_THRESHOLD)
@@ -134,38 +131,15 @@ min16float4 main(float4 sspos : SV_POSITION) : SV_TARGET
 #ifdef _POINT_LIGHT_
 			const float3 lightStep = normalize(g_localSpaceLightPt - pos) * g_lightStepScale;
 #endif
+			const float3 light = GetLight(pos, lightStep);
 
-			// Sample light
-			min16float lightTrans = 1.0;	// Transmittance along light ray
-			float3 lightPos = pos + lightStep;
-
-			for (uint j = 0; j < NUM_LIGHT_SAMPLES; ++j)
-			{
-				if (any(abs(lightPos) > 1.0)) break;
-				tex = min16float3(0.5, -0.5, 0.5) * lightPos + 0.5;
-
-				// Get a sample along light ray
-				const min16float density = GetSample(tex).w;
-
-				// Attenuate ray-throughput along light direction
-				lightTrans *= saturate(1.0 - ABSORPTION * g_lightStepScale * density);
-				if (lightTrans < ZERO_THRESHOLD) break;
-
-				// Update position along light ray
-				lightPos += lightStep;
-			}
-
-			scatter += lightTrans * transmit * scaledColor.xyz;
+			scatter += light * transmit * scaledColor.xyz;
 			ambient += transmit * scaledColor.xyz;
 		}
-
-		pos += step;
+		t += max(1.5 * g_stepScale * t, g_stepScale);
 	}
 
-	//clip(ONE_THRESHOLD - transmit);
-
 	min16float3 result = scatter + lerp(ambient, 1.0, 0.75) * 0.16;
-	//result = lerp(result, g_clearColor * g_clearColor, transmit);
 
 	return min16float4(sqrt(result), saturate(1.0 - transmit));
 }
