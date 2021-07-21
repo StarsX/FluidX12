@@ -14,6 +14,16 @@
 using namespace std;
 using namespace XUSG;
 
+
+enum RenderMethod
+{
+	RAY_MARCH_MERGED,
+	RAY_MARCH_SPLITTED,
+
+	NUM_RENDER_METHOD
+};
+RenderMethod g_renderMethod = RAY_MARCH_SPLITTED;
+
 const float g_FOVAngleY = XM_PIDIV4;
 const float g_zNear = 1.0f;
 const float g_zFar = 1000.0f;
@@ -234,6 +244,12 @@ void FluidX::OnKeyUp(uint8_t key)
 	case VK_F1:
 		m_showFPS = !m_showFPS;
 		break;
+	case VK_LEFT:
+		g_renderMethod = static_cast<RenderMethod>((g_renderMethod + NUM_RENDER_METHOD - 1) % NUM_RENDER_METHOD);
+		break;
+	case VK_RIGHT:
+		g_renderMethod = static_cast<RenderMethod>((g_renderMethod + 1) % NUM_RENDER_METHOD);
+		break;
 	}
 }
 
@@ -362,8 +378,19 @@ void FluidX::PopulateCommandList()
 	pCommandList->RSSetViewports(1, &viewport);
 	pCommandList->RSSetScissorRects(1, &scissorRect);
 
-	m_fluid->Render(pCommandList, m_frameIndex);
-	
+	//m_fluid->Render(pCommandList, m_frameIndex);
+	switch (g_renderMethod)
+	{
+	case RAY_MARCH_MERGED:
+		m_fluid->Render(pCommandList, m_frameIndex,false);
+		break;
+	case RAY_MARCH_SPLITTED:
+		m_fluid->Render(pCommandList, m_frameIndex,true);
+		break;
+	default:
+		m_fluid->Render(pCommandList, m_frameIndex,false);
+	}
+
 	// Indicate that the back buffer will now be used to present.
 	numBarriers = m_renderTargets[m_frameIndex]->SetBarrier(barriers, ResourceState::PRESENT);
 	pCommandList->Barrier(numBarriers, barriers);
@@ -428,6 +455,19 @@ double FluidX::CalculateFrameStats(float* pTimeStep)
 		windowText << L"    fps: ";
 		if (m_showFPS) windowText << setprecision(2) << fixed << fps;
 		else windowText << L"[F1]";
+		windowText << "  ";
+		switch (g_renderMethod)
+		{
+		case RAY_MARCH_MERGED:
+			windowText << L"Ray marching without splitted lighting pass";
+			break;
+		case RAY_MARCH_SPLITTED:
+			windowText << L"Ray marching with splitted lighting pass";
+			break;
+		default:
+			windowText << L"Simple particle rendering";
+		}
+
 		SetCustomWindowText(windowText.str().c_str());
 	}
 

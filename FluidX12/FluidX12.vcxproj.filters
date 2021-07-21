@@ -106,6 +106,12 @@
     <None Include="Content\Shaders\Impulse.hlsli">
       <Filter>Shaders\Simulation</Filter>
     </None>
+    <None Include="Content\Shaders\RayCast.hlsli">
+      <Filter>Shaders\Rendering</Filter>
+    </None>
+    <None Include="Content\Shaders\RayMarch.hlsli">
+      <Filter>Shaders\Rendering</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Content\Shaders\CSAdvect.hlsl">
@@ -137,6 +143,12 @@
     </FxCompile>
     <FxCompile Include="Content\Shaders\PSParticle.hlsl">
       <Filter>Shaders\Particle</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\PSRayCastV.hlsl">
+      <Filter>Shaders\Rendering</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\CSRayMarchL.hlsl">
+      <Filter>Shaders\Rendering</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>
