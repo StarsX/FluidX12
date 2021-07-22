@@ -8,7 +8,7 @@
 // Constant
 //--------------------------------------------------------------------------------------
 static const min16float g_stepScale = g_maxDist / NUM_LIGHT_SAMPLES;
-static const min16float g_lightStepScale = g_maxDist / NUM_LIGHT_SAMPLES;
+
 //--------------------------------------------------------------------------------------
 // Unordered access texture
 //--------------------------------------------------------------------------------------

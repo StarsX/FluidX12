@@ -255,18 +255,19 @@ void Fluid::Simulate(const CommandList* pCommandList, uint8_t frameIndex)
 	}
 }
 
-void Fluid::Render(const CommandList* pCommandList, uint8_t frameIndex,bool splitLightPass)
+void Fluid::Render(const CommandList* pCommandList, uint8_t frameIndex, uint8_t flags)
 {
+	const bool separateLightPass = flags & SEPARATE_LIGHT_PASS;
+
 	if (m_numParticles > 0) renderParticles(pCommandList, frameIndex);
 	else if (m_gridSize.z > 1)
 	{
-		if (splitLightPass)
+		if (separateLightPass)
 		{
 			RayMarchL(pCommandList, frameIndex);
 			RayMarchV(pCommandList, frameIndex);
 		}
-		else
-			rayCast(pCommandList, frameIndex);
+		else rayCast(pCommandList, frameIndex);
 	}
 	else visualizeColor(pCommandList);
 }
