@@ -18,11 +18,11 @@ using namespace XUSG;
 enum RenderMethod
 {
 	RAY_MARCH_MERGED,
-	RAY_MARCH_SPLITTED,
+	RAY_MARCH_SEPARATE,
 
 	NUM_RENDER_METHOD
 };
-RenderMethod g_renderMethod = RAY_MARCH_SPLITTED;
+RenderMethod g_renderMethod = RAY_MARCH_SEPARATE;
 
 const float g_FOVAngleY = XM_PIDIV4;
 const float g_zNear = 1.0f;
@@ -378,17 +378,16 @@ void FluidX::PopulateCommandList()
 	pCommandList->RSSetViewports(1, &viewport);
 	pCommandList->RSSetScissorRects(1, &scissorRect);
 
-	//m_fluid->Render(pCommandList, m_frameIndex);
 	switch (g_renderMethod)
 	{
 	case RAY_MARCH_MERGED:
-		m_fluid->Render(pCommandList, m_frameIndex,false);
+		m_fluid->Render(pCommandList, m_frameIndex, Fluid::RAY_MARCH_DIRECT);
 		break;
-	case RAY_MARCH_SPLITTED:
-		m_fluid->Render(pCommandList, m_frameIndex,true);
+	case RAY_MARCH_SEPARATE:
+		m_fluid->Render(pCommandList, m_frameIndex, Fluid::SEPARATE_LIGHT_PASS);
 		break;
 	default:
-		m_fluid->Render(pCommandList, m_frameIndex,false);
+		m_fluid->Render(pCommandList, m_frameIndex, Fluid::RAY_MARCH_DIRECT);
 	}
 
 	// Indicate that the back buffer will now be used to present.
@@ -459,10 +458,10 @@ double FluidX::CalculateFrameStats(float* pTimeStep)
 		switch (g_renderMethod)
 		{
 		case RAY_MARCH_MERGED:
-			windowText << L"Ray marching without splitted lighting pass";
+			windowText << L"Ray marching without separate lighting pass";
 			break;
-		case RAY_MARCH_SPLITTED:
-			windowText << L"Ray marching with splitted lighting pass";
+		case RAY_MARCH_SEPARATE:
+			windowText << L"Ray marching with separate lighting pass";
 			break;
 		default:
 			windowText << L"Simple particle rendering";

@@ -10,6 +10,12 @@
 class Fluid
 {
 public:
+	enum RenderFlags : uint8_t
+	{
+		RAY_MARCH_DIRECT = 0,
+		SEPARATE_LIGHT_PASS = (1 << 0)
+	};
+
 	Fluid(const XUSG::Device::sptr& device);
 	virtual ~Fluid();
 
@@ -21,7 +27,7 @@ public:
 	void UpdateFrame(float timeStep, uint8_t frameIndex, const DirectX::XMFLOAT4X4& view,
 		const DirectX::XMFLOAT4X4& proj, const DirectX::XMFLOAT3& eyePt);
 	void Simulate(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
-	void Render(const XUSG::CommandList* pCommandList, uint8_t frameIndex, bool splitLightPass);
+	void Render(const XUSG::CommandList* pCommandList, uint8_t frameIndex, uint8_t flags);
 	void RayMarchL(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	void RayMarchV(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	static const uint8_t FrameCount = 3;
