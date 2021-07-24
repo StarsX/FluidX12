@@ -28,8 +28,7 @@ public:
 		const DirectX::XMFLOAT4X4& proj, const DirectX::XMFLOAT3& eyePt);
 	void Simulate(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	void Render(const XUSG::CommandList* pCommandList, uint8_t frameIndex, uint8_t flags);
-	void RayMarchL(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
-	void RayMarchV(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
+
 	static const uint8_t FrameCount = 3;
 
 protected:
@@ -50,13 +49,12 @@ protected:
 		SRV_UAV_TABLE_VECOLITY1,
 		SRV_UAV_TABLE_COLOR,
 		SRV_UAV_TABLE_COLOR1,
-		UAV_TABLE_INCOMPRESS,
-		UAV_SRV_TABLE_PARTICLE,
 		SRV_UAV_TABLE_COLOR_LIGHT_MAP,
 		SRV_UAV_TABLE_COLOR_LIGHT_MAP1,
-
 		SRV_TABLE_COLOR_LIGHT_MAP,
 		SRV_TABLE_COLOR_LIGHT_MAP1,
+		UAV_TABLE_INCOMPRESS,
+		UAV_SRV_TABLE_PARTICLE,
 
 		NUM_SRV_UAV_TABLE
 	};
@@ -82,6 +80,8 @@ protected:
 
 	void visualizeColor(const XUSG::CommandList* pCommandList);
 	void rayCast(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void rayMarchL(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void rayMarchV(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	void renderParticles(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 
 	XUSG::Device::sptr m_device;
@@ -112,14 +112,13 @@ protected:
 	DirectX::XMFLOAT4		m_lightColor;
 	DirectX::XMFLOAT4		m_ambient;
 	DirectX::XMUINT3		m_gridSize;
+	DirectX::XMUINT3		m_lightMapSize;
 	DirectX::XMUINT2		m_viewport;
-	DirectX::XMFLOAT4X4		m_volumeWorld;
-	DirectX::XMFLOAT4X4		m_lightMapWorld;
+	DirectX::XMFLOAT3X4		m_volumeWorld;
+	DirectX::XMFLOAT3X4		m_lightMapWorld;
 
 	float					m_timeStep;
 	float					m_timeInterval;
 	uint8_t					m_frameParity;
 	uint32_t				m_numParticles;
-
-	DirectX::XMUINT3					m_lightGridSize;
 };

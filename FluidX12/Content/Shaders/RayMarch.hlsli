@@ -5,19 +5,20 @@
 #include "RayCast.hlsli"
 
 #define NUM_SAMPLES			256
-#define NUM_LIGHT_SAMPLES	128
+#define NUM_LIGHT_SAMPLES	64
 #define ABSORPTION			1.0
 #define ZERO_THRESHOLD		0.01
 #define ONE_THRESHOLD		0.99
 
 //--------------------------------------------------------------------------------------
-// Constant
+// Constants
 //--------------------------------------------------------------------------------------
 static const min16float g_maxDist = 2.0 * sqrt(3.0);
+static const min16float g_stepScale = g_maxDist / NUM_SAMPLES;
 static const min16float g_lightStepScale = g_maxDist / NUM_LIGHT_SAMPLES;
 
 //--------------------------------------------------------------------------------------
-// Texture
+// Textures
 //--------------------------------------------------------------------------------------
 Texture3D<float4> g_txGrid;
 
@@ -25,15 +26,24 @@ Texture3D<float4> g_txGrid;
 Texture3D<float3> g_txLightMap;
 #endif
 
+#ifdef _HAS_DEPTH_MAP_
+Texture2D<float> g_txDepth;
+#endif
+
+#if defined(_HAS_SHADOW_MAP_) && !defined(_LIGHT_PASS_)
+Texture2D<float> g_txShadow;
+#endif
+
 //--------------------------------------------------------------------------------------
 // Sample density field
 //--------------------------------------------------------------------------------------
-min16float4 GetSample(float3 tex)
+min16float4 GetSample(float3 uvw)
 {
-	min16float4 color = min16float4(g_txGrid.SampleLevel(g_smpLinear, tex, 0.0));
-	color.w *= 24.0;
+	min16float4 color = min16float4(g_txGrid.SampleLevel(g_smpLinear, uvw, 0.0));
+	//min16float4 color = min16float4(0.0, 0.5, 1.0, 0.5);
+	color.w *= DENSITY_SCALE;
 
-	return min(min16float4(color.xyz * color.w, color.w), 24.0);
+	return color;
 }
 
 //--------------------------------------------------------------------------------------
@@ -41,8 +51,37 @@ min16float4 GetSample(float3 tex)
 //--------------------------------------------------------------------------------------
 min16float GetOpacity(min16float density, min16float stepScale)
 {
-	return saturate(density * stepScale * ABSORPTION);
+	return saturate(density * stepScale * ABSORPTION * 4.0);
 }
+
+//--------------------------------------------------------------------------------------
+// Get occluded end point
+//--------------------------------------------------------------------------------------
+float GetTMax(float3 pos, float3 rayOrigin, float3 rayDir)
+{
+	const float4 hpos = mul(float4(pos, 1.0), g_worldViewProjI);
+	pos = hpos.xyz / hpos.w;
+
+	const float3 t = (pos - rayOrigin) / rayDir;
+
+	return max(max(t.x, t.y), t.z);
+}
+
+//--------------------------------------------------------------------------------------
+// Get occluded end point
+//--------------------------------------------------------------------------------------
+#ifdef _HAS_SHADOW_MAP_
+min16float ShadowTest(float3 pos, Texture2D<float> txDepth)
+{
+	const float3 lsPos = mul(float4(pos, 1.0), g_shadowWVP).xyz;
+	float2 shadowUV = lsPos.xy * 0.5 + 0.5;
+	shadowUV.y = 1.0 - shadowUV.y;
+
+	const float depth = txDepth.SampleLevel(g_smpLinear, shadowUV, 0.0);
+
+	return lsPos.z < depth;
+}
+#endif
 
 //--------------------------------------------------------------------------------------
 // Compute start point of the ray
@@ -77,6 +116,18 @@ bool ComputeRayOrigin(inout float3 rayOrigin, float3 rayDir)
 }
 
 //--------------------------------------------------------------------------------------
+// Local position to texture space
+//--------------------------------------------------------------------------------------
+float3 LocalToTex3DSpace(float3 pos)
+{
+#ifdef _TEXCOORD_INVERT_Y_
+	return pos * float3(0.5, -0.5, 0.5) + 0.5;
+#else
+	return pos * 0.5 + 0.5;
+#endif
+}
+
+//--------------------------------------------------------------------------------------
 // Get light
 //--------------------------------------------------------------------------------------
 #ifdef _LIGHT_PASS_
@@ -89,7 +140,12 @@ float3 GetLight(float3 pos, float3 step)
 #else
 float3 GetLight(float3 pos, float3 step)
 {
-	min16float shadow = 1.0; // Transmittance along light ray
+	// Transmittance along light ray
+#ifdef _HAS_SHADOW_MAP_
+	min16float shadow = ShadowTest(pos, g_txShadow);
+#else
+	min16float shadow = 1.0;
+#endif
 
 	if (shadow > 0.0)
 	{
@@ -98,7 +154,7 @@ float3 GetLight(float3 pos, float3 step)
 			// Update position along light ray
 			pos += step;
 			if (any(abs(pos) > 1.0)) break;
-			const float3 uvw = pos * 0.5 + 0.5;
+			const float3 uvw = LocalToTex3DSpace(pos);
 
 			// Get a sample along light ray
 			const min16float density = GetSample(uvw).w;

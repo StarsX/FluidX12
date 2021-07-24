@@ -11,11 +11,7 @@ struct PSIn
 };
 
 //--------------------------------------------------------------------------------------
-// Constant
-//--------------------------------------------------------------------------------------
-static const min16float g_stepScale = g_maxDist / NUM_SAMPLES;
-
-// Screen space to loacal space
+// Screen space to local space
 //--------------------------------------------------------------------------------------
 float3 TexcoordToLocalPos(float2 uv)
 {
@@ -29,61 +25,90 @@ float3 TexcoordToLocalPos(float2 uv)
 }
 
 //--------------------------------------------------------------------------------------
+// Get clip-space position
+//--------------------------------------------------------------------------------------
+#ifdef _HAS_DEPTH_MAP_
+float3 GetClipPos(uint2 idx, float2 uv)
+{
+	const float z = g_txDepth[idx];
+	float2 xy = uv * 2.0 - 1.0;
+	xy.y = -xy.y;
+
+	return float3(xy, z);
+}
+#endif
+
+//--------------------------------------------------------------------------------------
 // Pixel Shader
 //--------------------------------------------------------------------------------------
 min16float4 main(PSIn input) : SV_TARGET
 {
-	float3 rayOrigin = TexcoordToLocalPos(input.UV);		// The point on the near plane
+	float3 rayOrigin = TexcoordToLocalPos(input.UV);	// The point on the near plane
+	const float3 localSpaceEyePt = mul(g_eyePos, g_worldI);
 
-	const float3 localSpaceEyePt = mul(g_eyePos, g_worldI).xyz;
 	const float3 rayDir = normalize(rayOrigin - localSpaceEyePt);
 	if (!ComputeRayOrigin(rayOrigin, rayDir)) discard;
 
-	const float3 step = rayDir * g_stepScale;
+#ifdef _HAS_DEPTH_MAP_
+	// Calculate occluded end point
+	const float3 pos = GetClipPos(input.Pos.xy, input.UV);
+	const float tMax = GetTMax(pos, rayOrigin, rayDir);
+#endif
 
 #ifdef _POINT_LIGHT_
-	const float3 localSpaceLightPt = mul(g_lightPos, g_worldI).xyz;
+	const float3 localSpaceLightPt = mul(g_lightPos, g_worldI);
 #else
 	const float3 localSpaceLightPt = mul(g_lightPos.xyz, (float3x3)g_worldI);
 	const float3 lightStep = normalize(localSpaceLightPt) * g_lightStepScale;
 #endif
 
 	// Transmittance
-	min16float transmit = 1.0;
+	min16float transm = 1.0;
+
 	// In-scattered radiance
-	min16float3 ambient = 0.0;
 	min16float3 scatter = 0.0;
+
 	float t = 0.0;
 	for (uint i = 0; i < NUM_SAMPLES; ++i)
 	{
 		const float3 pos = rayOrigin + rayDir * t;
 		if (any(abs(pos) > 1.0)) break;
-		float3 tex = float3(0.5, -0.5, 0.5) * pos + 0.5;
+		const float3 uvw = LocalToTex3DSpace(pos);
 
 		// Get a sample
-		min16float4 color = GetSample(tex);
+		min16float4 color = GetSample(uvw);
 
 		// Skip empty space
 		if (color.w > ZERO_THRESHOLD)
 		{
-			// Attenuate ray-throughput
-			const min16float4 scaledColor = color * g_stepScale;
-			transmit *= saturate(1.0 - scaledColor.w * ABSORPTION);
-			if (transmit < ZERO_THRESHOLD) break;
-
-			// Point light direction in texture space
 #ifdef _POINT_LIGHT_
+			// Point light direction in texture space
 			const float3 lightStep = normalize(g_localSpaceLightPt - pos) * g_lightStepScale;
 #endif
+			// Sample light
 			const float3 light = GetLight(pos, lightStep);
+			
+			// Accumulate color
+			color.w = GetOpacity(color.w, g_stepScale);
+			color.xyz *= transm * color.w;
 
-			scatter += min16float3(light) * transmit * scaledColor.xyz;
-			ambient += transmit * scaledColor.xyz;
+			//scatter += color.xyz;
+			scatter += min16float3(light) * color.xyz;
+
+			// Attenuate ray-throughput
+			transm *= 1.0 - color.w;
+			if (transm < ZERO_THRESHOLD) break;
 		}
+
 		t += max(1.5 * g_stepScale * t, g_stepScale);
+#ifdef _HAS_DEPTH_MAP_
+		if (t > tMax) break;
+#endif
 	}
 
-	min16float3 result = scatter + lerp(ambient, 1.0, 0.75) * 0.16;
-
-	return min16float4(sqrt(result), saturate(1.0 - transmit));
+#ifdef _GAMMA_
+	return min16float4(sqrt(scatter), 1.0 - transm);
+#else
+	return min16float4(scatter, 1.0 - transm);
+#endif
 }
