@@ -41,6 +41,9 @@ min16float4 GetSample(float3 uvw)
 {
 	min16float4 color = min16float4(g_txGrid.SampleLevel(g_smpLinear, uvw, 0.0));
 	//min16float4 color = min16float4(0.0, 0.5, 1.0, 0.5);
+#ifdef _PRE_MULTIPLIED_
+	color.xyz /= color.w;
+#endif
 	color.w *= DENSITY_SCALE;
 
 	return color;
