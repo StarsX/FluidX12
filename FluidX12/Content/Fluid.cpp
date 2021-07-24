@@ -21,11 +21,11 @@ struct CBPerObjectParticle
 	XMFLOAT4X4 Proj;
 };
 
-struct CBPerObject
+struct CBPerObjectGrid3D
 {
-	XMMATRIX WorldViewProjI;
-	XMMATRIX WorldI;
-	XMMATRIX LightMapWorld;
+	XMFLOAT4X4 WorldViewProjI;
+	XMFLOAT3X4 WorldI;
+	XMFLOAT3X4 LightMapWorld;
 	XMFLOAT4 EyePos;
 	XMFLOAT4 LightPos;
 	XMFLOAT4 LightColor;
@@ -37,15 +37,15 @@ Fluid::Fluid(const Device::sptr& device) :
 	m_timeInterval(0.0f),
 	m_frameParity(0),
 	m_lightPt(75.0f, 75.0f, -75.0f),
-	m_lightColor(1.0f, 0.7f, 0.3f, 1.0f),
-	m_ambient(0.0f, 0.3f, 1.0f, 0.3f)
+	m_lightColor(1.0f, 0.7f, 0.3f, XM_PI * 8.0f),
+	m_ambient(1.0f, 1.0f, 1.0f, XM_PI * 2.0f)
 {
 	m_shaderPool = ShaderPool::MakeUnique();
 	m_graphicsPipelineCache = Graphics::PipelineCache::MakeUnique(device.get());
 	m_computePipelineCache = Compute::PipelineCache::MakeUnique(device.get());
 	m_pipelineLayoutCache = PipelineLayoutCache::MakeUnique(device.get());
 
-	XMStoreFloat4x4(&m_volumeWorld, XMMatrixScaling(10.0f, 10.0f, 10.0f));
+	XMStoreFloat3x4(&m_volumeWorld, XMMatrixScaling(10.0f, 10.0f, 10.0f));
 	m_lightMapWorld = m_volumeWorld;
 }
 
@@ -82,6 +82,12 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 		ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryType::DEFAULT,
 		L"Incompressibility"), false);
 
+	m_lightMapSize = gridSize;
+	m_lightMap = Texture3D::MakeUnique();
+	N_RETURN(m_lightMap->Create(m_device.get(), m_lightMapSize.x, m_lightMapSize.y, m_lightMapSize.z,
+		Format::R11G11B10_FLOAT, ResourceFlag::ALLOW_UNORDERED_ACCESS | ResourceFlag::ALLOW_SIMULTANEOUS_ACCESS,
+		1, MemoryType::DEFAULT, L"LightMap"), false);
+
 	// Create constant buffers
 	m_cbPerFrame = ConstantBuffer::MakeUnique();
 	N_RETURN(m_cbPerFrame->Create(m_device.get(), sizeof(CBPerFrame[FrameCount]), FrameCount,
@@ -96,7 +102,7 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 	else if (m_gridSize.z > 1)
 	{
 		m_cbPerObject = ConstantBuffer::MakeUnique();
-		N_RETURN(m_cbPerObject->Create(m_device.get(), sizeof(CBPerObject[FrameCount]), FrameCount,
+		N_RETURN(m_cbPerObject->Create(m_device.get(), sizeof(CBPerObjectGrid3D[FrameCount]), FrameCount,
 			nullptr, MemoryType::UPLOAD, L"CBPerObject"), false);
 	}
 
@@ -122,11 +128,6 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 		m_particleBuffer->Upload(pCommandList, uploaders.back().get(), particles.data(),
 			sizeof(ParticleInfo) * numParticles);
 	}
-	m_lightGridSize = gridSize;
-	m_lightMap = Texture3D::MakeUnique();
-	N_RETURN(m_lightMap->Create(m_device.get(), m_lightGridSize.x, m_lightGridSize.y, m_lightGridSize.z,
-		Format::R11G11B10_FLOAT, ResourceFlag::ALLOW_UNORDERED_ACCESS | ResourceFlag::ALLOW_SIMULTANEOUS_ACCESS,
-		1, MemoryType::DEFAULT, L"LightMap"), false);
 
 	// Create pipelines
 	N_RETURN(createPipelineLayouts(), false);
@@ -147,7 +148,7 @@ void Fluid::UpdateFrame(float timeStep, uint8_t frameIndex,
 	}
 
 	// Per-object
-	const auto world = XMLoadFloat4x4(&m_volumeWorld);
+	const auto world = XMLoadFloat3x4(&m_volumeWorld);
 
 	if (m_numParticles > 0)
 	{
@@ -174,12 +175,12 @@ void Fluid::UpdateFrame(float timeStep, uint8_t frameIndex,
 		const auto worldViewProj = world * viewProj;
 
 		// Screen space matrices
-		const auto pCbPerObject = reinterpret_cast<CBPerObject*>(m_cbPerObject->Map(frameIndex));
-		pCbPerObject->WorldViewProjI = XMMatrixTranspose(XMMatrixInverse(nullptr, worldViewProj));
-		pCbPerObject->WorldI = XMMatrixTranspose(XMMatrixInverse(nullptr, world));
+		const auto pCbPerObject = reinterpret_cast<CBPerObjectGrid3D*>(m_cbPerObject->Map(frameIndex));
+		XMStoreFloat4x4(&pCbPerObject->WorldViewProjI, XMMatrixTranspose(XMMatrixInverse(nullptr, worldViewProj)));
+		XMStoreFloat3x4(&pCbPerObject->WorldI, XMMatrixInverse(nullptr, world));
 
 		// Lighting
-		pCbPerObject->LightMapWorld = XMMatrixTranspose(XMLoadFloat4x4(&m_lightMapWorld));
+		pCbPerObject->LightMapWorld = m_lightMapWorld;
 		pCbPerObject->EyePos = XMFLOAT4(eyePt.x, eyePt.y, eyePt.z, 1.0f);
 		pCbPerObject->LightPos = XMFLOAT4(m_lightPt.x, m_lightPt.y, m_lightPt.z, 1.0f);
 		pCbPerObject->LightColor = m_lightColor;
@@ -264,8 +265,8 @@ void Fluid::Render(const CommandList* pCommandList, uint8_t frameIndex, uint8_t 
 	{
 		if (separateLightPass)
 		{
-			RayMarchL(pCommandList, frameIndex);
-			RayMarchV(pCommandList, frameIndex);
+			rayMarchL(pCommandList, frameIndex);
+			rayMarchV(pCommandList, frameIndex);
 		}
 		else rayCast(pCommandList, frameIndex);
 	}
@@ -317,7 +318,7 @@ bool Fluid::createPipelineLayouts()
 		{
 			// Ray casting
 			const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
-			pipelineLayout->SetRange(0, DescriptorType::CBV, 1, 0, 0, DescriptorFlag::DATA_STATIC);
+			pipelineLayout->SetRootCBV(0, 0, 0, Shader::Stage::PS);
 			pipelineLayout->SetRange(1, DescriptorType::SRV, 1, 0);
 			pipelineLayout->SetRange(2, DescriptorType::SAMPLER, 1, 0);
 			pipelineLayout->SetShaderStage(0, Shader::Stage::PS);
@@ -327,11 +328,10 @@ bool Fluid::createPipelineLayouts()
 				PipelineLayoutFlag::NONE, L"RayCastingLayout"), false);
 		}
 
-
 		// Light space ray marching
 		{
 			const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
-			pipelineLayout->SetRange(0, DescriptorType::CBV, 1, 0, 0, DescriptorFlag::DATA_STATIC);
+			pipelineLayout->SetRootCBV(0, 0);
 			pipelineLayout->SetRange(1, DescriptorType::SRV, 1, 0);
 			pipelineLayout->SetRange(1, DescriptorType::UAV, 1, 0, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
 			pipelineLayout->SetRange(2, DescriptorType::SAMPLER, 1, 0);
@@ -342,7 +342,7 @@ bool Fluid::createPipelineLayouts()
 		// View space ray marching
 		{
 			const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
-			pipelineLayout->SetRange(0, DescriptorType::CBV, 1, 0, 0, DescriptorFlag::DATA_STATIC);
+			pipelineLayout->SetRootCBV(0, 0, 0, Shader::Stage::PS);
 			//pipelineLayout->SetRange(1, DescriptorType::UAV, 1, 0, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
 			pipelineLayout->SetRange(1, DescriptorType::SRV, 2, 0);
 			pipelineLayout->SetRange(2, DescriptorType::SAMPLER, 1, 0);
@@ -487,14 +487,6 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 
 bool Fluid::createDescriptorTables()
 {
-		// Create CBV tables
-	for (uint8_t i = 0; i < FrameCount; ++i)
-	{
-		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
-		descriptorTable->SetDescriptors(0, 1, &m_cbPerObject->GetCBV(i));
-		X_RETURN(m_cbvTables[i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
-	}
-
 	if (m_numParticles > 0)
 	{
 		// Create particle UAV
@@ -529,7 +521,7 @@ bool Fluid::createDescriptorTables()
 		const Descriptor descriptors[] =
 		{
 			m_colors[(i + 1) % 2]->GetSRV(),
-			m_colors[i]->GetUAV(),
+			m_colors[i]->GetUAV()
 		};
 		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
 		X_RETURN(m_srvUavTables[SRV_UAV_TABLE_COLOR + i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
@@ -541,7 +533,7 @@ bool Fluid::createDescriptorTables()
 		const Descriptor descriptors[] =
 		{
 			m_colors[(i + 1) % 2]->GetSRV(),
-			m_lightMap->GetUAV(),
+			m_lightMap->GetUAV()
 		};
 		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
 		X_RETURN(m_srvUavTables[SRV_UAV_TABLE_COLOR_LIGHT_MAP + i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
@@ -553,7 +545,7 @@ bool Fluid::createDescriptorTables()
 		const Descriptor descriptors[] =
 		{
 			m_colors[(i + 1) % 2]->GetSRV(),
-			m_lightMap->GetSRV(),
+			m_lightMap->GetSRV()
 		};
 		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
 		X_RETURN(m_srvUavTables[SRV_TABLE_COLOR_LIGHT_MAP + i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
@@ -602,8 +594,50 @@ void Fluid::rayCast(const CommandList* pCommandList, uint8_t frameIndex)
 	pCommandList->IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);
 
 	// Set descriptor tables
-	pCommandList->SetGraphicsDescriptorTable(0, m_cbvTables[frameIndex]);
+	pCommandList->SetGraphicsRootConstantBufferView(0, m_cbPerObject.get(), m_cbPerObject->GetCBVOffset(frameIndex));
 	pCommandList->SetGraphicsDescriptorTable(1, m_srvUavTables[SRV_UAV_TABLE_COLOR_LIGHT_MAP + !m_frameParity]);
+	pCommandList->SetGraphicsDescriptorTable(2, m_samplerTables[SAMPLER_TABLE_CLAMP]);
+
+	pCommandList->Draw(3, 1, 0, 0);
+}
+
+void Fluid::rayMarchL(const CommandList* pCommandList, uint8_t frameIndex)
+{
+	// Set barrier
+	ResourceBarrier barrier;
+	m_lightMap->SetBarrier(&barrier, ResourceState::UNORDERED_ACCESS);
+
+	// Set pipeline state
+	pCommandList->SetComputePipelineLayout(m_pipelineLayouts[RAY_MARCH_L]);
+	pCommandList->SetPipelineState(m_pipelines[RAY_MARCH_L]);
+
+	// Set descriptor tables
+	pCommandList->SetComputeRootConstantBufferView(0, m_cbPerObject.get(), m_cbPerObject->GetCBVOffset(frameIndex));
+	pCommandList->SetComputeDescriptorTable(1, m_srvUavTables[SRV_UAV_TABLE_COLOR_LIGHT_MAP + !m_frameParity]);
+	//pCommandList->SetComputeDescriptorTable(1, m_srvUavTables[UAV_TABLE_LIGHT_MAP]);
+	pCommandList->SetComputeDescriptorTable(2, m_samplerTables[SAMPLER_TABLE_CLAMP]);
+
+	// Dispatch grid
+	pCommandList->Dispatch(DIV_UP(m_lightMapSize.x, 4), DIV_UP(m_lightMapSize.y, 4), DIV_UP(m_lightMapSize.z, 4));
+}
+
+void Fluid::rayMarchV(const CommandList* pCommandList, uint8_t frameIndex)
+{
+	// Set barriers
+	ResourceBarrier barriers;
+	auto numBarriers = m_lightMap->SetBarrier(&barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE);
+	pCommandList->Barrier(numBarriers, &barriers);
+
+	// Set pipeline state
+	pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[RAY_MARCH_V]);
+	pCommandList->SetPipelineState(m_pipelines[RAY_MARCH_V]);
+
+	pCommandList->IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);
+
+	// Set descriptor tables
+	pCommandList->SetGraphicsRootConstantBufferView(0, m_cbPerObject.get(), m_cbPerObject->GetCBVOffset(frameIndex));
+	pCommandList->SetGraphicsDescriptorTable(1, m_srvUavTables[SRV_TABLE_COLOR_LIGHT_MAP + !m_frameParity]);
+	//pCommandList->SetGraphicsDescriptorTable(1, m_srvUavTables[SRV_TABLE_LIGHT_MAP]);
 	pCommandList->SetGraphicsDescriptorTable(2, m_samplerTables[SAMPLER_TABLE_CLAMP]);
 
 	pCommandList->Draw(3, 1, 0, 0);
@@ -630,47 +664,4 @@ void Fluid::renderParticles(const CommandList* pCommandList, uint8_t frameIndex)
 	pCommandList->SetGraphicsDescriptorTable(4, m_samplerTables[SAMPLER_TABLE_CLAMP]);
 
 	pCommandList->Draw(m_numParticles, 1, 0, 0);
-}
-
-void Fluid::RayMarchL(const CommandList* pCommandList, uint8_t frameIndex)
-{
-	// Set barrier
-	ResourceBarrier barrier;
-	m_lightMap->SetBarrier(&barrier, ResourceState::UNORDERED_ACCESS);
-
-	// Set pipeline state
-	pCommandList->SetComputePipelineLayout(m_pipelineLayouts[RAY_MARCH_L]);
-	pCommandList->SetPipelineState(m_pipelines[RAY_MARCH_L]);
-
-
-	// Set descriptor tables
-	pCommandList->SetComputeDescriptorTable(0, m_cbvTables[frameIndex]);
-	pCommandList->SetComputeDescriptorTable(1, m_srvUavTables[SRV_UAV_TABLE_COLOR_LIGHT_MAP + !m_frameParity]);
-	//pCommandList->SetComputeDescriptorTable(1, m_srvUavTables[UAV_TABLE_LIGHT_MAP]);
-	pCommandList->SetComputeDescriptorTable(2, m_samplerTables[SAMPLER_TABLE_CLAMP]);
-
-	// Dispatch grid
-	pCommandList->Dispatch(DIV_UP(m_lightGridSize.x, 4), DIV_UP(m_lightGridSize.y, 4), DIV_UP(m_lightGridSize.z, 4));
-}
-
-void Fluid::RayMarchV(const CommandList* pCommandList, uint8_t frameIndex)
-{
-	// Set barriers
-	ResourceBarrier barriers;
-	auto numBarriers = m_lightMap->SetBarrier(&barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE);
-	pCommandList->Barrier(numBarriers, &barriers);
-
-	// Set pipeline state
-	pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[RAY_MARCH_V]);
-	pCommandList->SetPipelineState(m_pipelines[RAY_MARCH_V]);
-
-	pCommandList->IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);
-
-	// Set descriptor tables
-	pCommandList->SetGraphicsDescriptorTable(0, m_cbvTables[frameIndex]);
-	pCommandList->SetGraphicsDescriptorTable(1, m_srvUavTables[SRV_TABLE_COLOR_LIGHT_MAP + !m_frameParity]);
-	//pCommandList->SetGraphicsDescriptorTable(1, m_srvUavTables[SRV_TABLE_LIGHT_MAP]);
-	pCommandList->SetGraphicsDescriptorTable(2, m_samplerTables[SAMPLER_TABLE_CLAMP]);
-
-	pCommandList->Draw(3, 1, 0, 0);
 }

@@ -198,7 +198,7 @@ void FluidX::OnUpdate()
 	float timeStep;
 	const auto totalTime = CalculateFrameStats(&timeStep);
 	pauseTime = m_isPaused ? totalTime - time : pauseTime;
-	timeStep = m_isPaused ? 0.0f : timeStep;
+	timeStep = m_isPaused ? 0.0f : (max)(timeStep, 0.015f);
 	time = totalTime - pauseTime;
 
 	// View

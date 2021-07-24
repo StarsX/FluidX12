@@ -5,11 +5,6 @@
 #include "RayMarch.hlsli"
 
 //--------------------------------------------------------------------------------------
-// Constant
-//--------------------------------------------------------------------------------------
-static const min16float g_stepScale = g_maxDist / NUM_LIGHT_SAMPLES;
-
-//--------------------------------------------------------------------------------------
 // Unordered access texture
 //--------------------------------------------------------------------------------------
 RWTexture3D<float3> g_rwLightMap;
@@ -27,47 +22,54 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	rayOrigin.xyz = (DTid + 0.5) / gridSize * 2.0 - 1.0;
 	rayOrigin.w = 1.0;
 
-	rayOrigin = mul(rayOrigin, g_lightMapWorld);	// Light-map space to world space
-	rayOrigin = mul(rayOrigin, g_worldI);			// World space to volume space
+	rayOrigin.xyz = mul(rayOrigin, g_lightMapWorld);	// Light-map space to world space
+	rayOrigin.xyz = mul(rayOrigin, g_worldI);			// World space to volume space
 
-	float3 tex = rayOrigin.xyz * 0.5 + 0.5;
-	min16float density;// = GetSample(tex).w;
-	/*if (density < ZERO_THRESHOLD)
+	// Transmittance
+#ifdef _HAS_SHADOW_MAP_
+	min16float shadow = ShadowTest(rayOrigin.xyz, g_txDepth);
+#else
+	min16float shadow = 1.0;
+#endif
+
+	float3 uvw = rayOrigin.xyz * 0.5 + 0.5;
+	/*const min16float density = GetSample(uvw).w;
+	if (density < ZERO_THRESHOLD)
 	{
 		g_rwLightMap[DTid] = 0.0;
 		return;
 	}*/
 
 #ifdef _POINT_LIGHT_
-	const float3 localSpaceLightPt = mul(g_lightPos, g_worldI).xyz;
-	const float3 rayDir = normalize(localSpaceLightPt - pos);
+	const float3 localSpaceLightPt = mul(g_lightPos, g_worldI);
+	const float3 rayDir = normalize(localSpaceLightPt - rayOrigin.xyz);
 #else
 	const float3 localSpaceLightPt = mul(g_lightPos.xyz, (float3x3)g_worldI);
 	const float3 rayDir = normalize(localSpaceLightPt);
 #endif
 
-	// Transmittance
-	min16float shadow = 1.0;
-
-	float t = 0.0;
-	for (uint i = 0; i < NUM_LIGHT_SAMPLES; ++i)
+	if (shadow > 0.0)
 	{
-		const float3 pos = rayOrigin.xyz + rayDir * t;
-		if (any(abs(pos) > 1.0)) break;
-		tex = pos * min16float3(0.5, -0.5, 0.5) + 0.5;
+		float t = 0.0;
+		for (uint i = 0; i < NUM_LIGHT_SAMPLES; ++i)
+		{
+			const float3 pos = rayOrigin.xyz + rayDir * t;
+			if (any(abs(pos) > 1.0)) break;
+			uvw = LocalToTex3DSpace(pos);
 
-		// Get a sample along light ray
-		density = GetSample(tex).w;
+			// Get a sample along light ray
+			const min16float density = GetSample(uvw).w;
 
-		// Attenuate ray-throughput along light direction
-		shadow *= 1.0 - GetOpacity(density, g_lightStepScale);
-		if (shadow < ZERO_THRESHOLD) break;
+			// Attenuate ray-throughput along light direction
+			shadow *= 1.0 - GetOpacity(density, g_lightStepScale);
+			if (shadow < ZERO_THRESHOLD) break;
 
-		// Update position along light ray
-		t += g_stepScale;
+			// Update position along light ray
+			t += g_lightStepScale;
+		}
 	}
-	
+
 	const min16float3 lightColor = min16float3(g_lightColor.xyz * g_lightColor.w);
 	const min16float3 ambient = min16float3(g_ambient.xyz * g_ambient.w);
-	g_rwLightMap[DTid] = float3(shadow, shadow, shadow);
+	g_rwLightMap[DTid] = lightColor * shadow + ambient;
 }
