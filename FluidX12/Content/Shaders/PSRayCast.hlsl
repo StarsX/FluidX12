@@ -90,7 +90,10 @@ min16float4 main(PSIn input) : SV_TARGET
 			
 			// Accumulate color
 			color.w = GetOpacity(color.w, g_stepScale);
-			color.xyz *= transm * color.w;
+			color.xyz *= transm;
+#ifndef _PRE_MULTIPLIED_
+			color.xyz *= color.w;
+#endif
 
 			//scatter += color.xyz;
 			scatter += min16float3(light) * color.xyz;
@@ -106,9 +109,5 @@ min16float4 main(PSIn input) : SV_TARGET
 #endif
 	}
 
-#ifdef _GAMMA_
-	return min16float4(sqrt(scatter), 1.0 - transm);
-#else
 	return min16float4(scatter, 1.0 - transm);
-#endif
 }
