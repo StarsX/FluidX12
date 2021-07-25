@@ -4,9 +4,8 @@
 
 #define _TEXCOORD_INVERT_Y_
 #define _PRE_MULTIPLIED_
-#define _GAMMA_
 
-#define DENSITY_SCALE 20.0
+#define DENSITY_SCALE 16.0
 
 //--------------------------------------------------------------------------------------
 // Constant buffer

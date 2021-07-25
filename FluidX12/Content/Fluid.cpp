@@ -425,7 +425,6 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 
 		{
 			// Ray casting
-			
 			N_RETURN(m_shaderPool->CreateShader(Shader::Stage::PS, psIndex, L"PSRayCast.cso"), false);
 
 			const auto state = Graphics::State::MakeUnique();
@@ -434,7 +433,7 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 			state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, psIndex++));
 			state->IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
 			state->DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache.get());
-			state->OMSetBlendState(Graphics::NON_PRE_MUL, m_graphicsPipelineCache.get());
+			state->OMSetBlendState(Graphics::PREMULTIPLITED, m_graphicsPipelineCache.get());
 			state->OMSetRTVFormats(&rtFormat, 1);
 			X_RETURN(m_pipelines[VISUALIZE], state->GetPipeline(m_graphicsPipelineCache.get(), L"RayCasting"), false);
 		}
@@ -460,7 +459,7 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 			state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, psIndex++));
 			state->IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
 			state->DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache.get());
-			state->OMSetBlendState(Graphics::NON_PRE_MUL, m_graphicsPipelineCache.get());
+			state->OMSetBlendState(Graphics::PREMULTIPLITED, m_graphicsPipelineCache.get());
 			state->OMSetRTVFormats(&rtFormat, 1);
 			X_RETURN(m_pipelines[RAY_MARCH_V], state->GetPipeline(m_graphicsPipelineCache.get(), L"ViewSpaceDirectRayCasting"), false);
 		}
@@ -476,7 +475,7 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 		state->SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, vsIndex));
 		state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, psIndex++));
 		state->IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
-		state->OMSetBlendState(Graphics::NON_PRE_MUL, m_graphicsPipelineCache.get());
+		state->OMSetBlendState(Graphics::PREMULTIPLITED, m_graphicsPipelineCache.get());
 		state->DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache.get());
 		state->OMSetRTVFormats(&rtFormat, 1);
 		X_RETURN(m_pipelines[VISUALIZE], state->GetPipeline(m_graphicsPipelineCache.get(), L"Visualization"), false);
