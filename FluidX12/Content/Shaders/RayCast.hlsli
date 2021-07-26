@@ -5,7 +5,9 @@
 #define _TEXCOORD_INVERT_Y_
 #define _PRE_MULTIPLIED_
 
-#define DENSITY_SCALE 16.0
+#define	INF				asfloat(0x7f800000)
+#define	FLT_MAX			3.402823466e+38
+#define DENSITY_SCALE	16.0
 
 //--------------------------------------------------------------------------------------
 // Constant buffer
