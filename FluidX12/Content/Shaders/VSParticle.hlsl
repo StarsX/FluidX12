@@ -2,6 +2,7 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
+#include "Simulation.hlsli"
 #include "Impulse.hlsli"
 
 #define RAND_MAX 0xffff

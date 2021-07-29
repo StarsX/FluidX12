@@ -228,6 +228,7 @@ COPY /Y "$(ProjectDir)XUSG\Bin\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir
     <None Include="Content\Shaders\CSPoisson.hlsli" />
     <None Include="Content\Shaders\RayCast.hlsli" />
     <None Include="Content\Shaders\RayMarch.hlsli" />
+    <None Include="Content\Shaders\Simulation.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Content\Shaders\CSAdvect.hlsl">
