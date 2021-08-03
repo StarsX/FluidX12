@@ -618,7 +618,7 @@ void Fluid::rayMarchV(const CommandList* pCommandList, uint8_t frameIndex)
 {
 	// Set barriers
 	ResourceBarrier barriers;
-	auto numBarriers = m_lightMap->SetBarrier(&barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE);
+	auto numBarriers = m_lightMap->SetBarrier(&barriers, ResourceState::PIXEL_SHADER_RESOURCE);
 	pCommandList->Barrier(numBarriers, &barriers);
 
 	// Set pipeline state
