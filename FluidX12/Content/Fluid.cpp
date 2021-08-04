@@ -579,7 +579,6 @@ void Fluid::visualizeColor(const CommandList* pCommandList)
 
 void Fluid::rayCast(const CommandList* pCommandList, uint8_t frameIndex)
 {
-
 	// Set pipeline state
 	pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[VISUALIZE]);
 	pCommandList->SetPipelineState(m_pipelines[VISUALIZE]);
