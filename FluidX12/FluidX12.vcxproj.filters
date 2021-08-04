@@ -112,6 +112,9 @@
     <None Include="Content\Shaders\RayMarch.hlsli">
       <Filter>Shaders\Rendering</Filter>
     </None>
+    <None Include="Content\Shaders\Simulation.hlsli">
+      <Filter>Shaders\Simulation</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Content\Shaders\CSAdvect.hlsl">

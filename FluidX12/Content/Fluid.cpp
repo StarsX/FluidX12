@@ -34,8 +34,8 @@ struct CBPerObjectGrid3D
 
 Fluid::Fluid(const Device::sptr& device) :
 	m_device(device),
-	m_timeInterval(0.0f),
 	m_frameParity(0),
+	m_timeInterval(0.0f),
 	m_lightPt(75.0f, 75.0f, -75.0f),
 	m_lightColor(1.0f, 0.7f, 0.3f, XM_PI),
 	m_ambient(1.0f, 1.0f, 1.0f, XM_PI * 0.1f)
@@ -579,7 +579,6 @@ void Fluid::visualizeColor(const CommandList* pCommandList)
 
 void Fluid::rayCast(const CommandList* pCommandList, uint8_t frameIndex)
 {
-
 	// Set pipeline state
 	pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[VISUALIZE]);
 	pCommandList->SetPipelineState(m_pipelines[VISUALIZE]);
@@ -618,7 +617,7 @@ void Fluid::rayMarchV(const CommandList* pCommandList, uint8_t frameIndex)
 {
 	// Set barriers
 	ResourceBarrier barriers;
-	auto numBarriers = m_lightMap->SetBarrier(&barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE);
+	auto numBarriers = m_lightMap->SetBarrier(&barriers, ResourceState::PIXEL_SHADER_RESOURCE);
 	pCommandList->Barrier(numBarriers, &barriers);
 
 	// Set pipeline state

@@ -12,6 +12,7 @@
 
 #define ITER 64
 
+#include "Simulation.hlsli"
 #include "CSPoisson.hlsli"
 
 //--------------------------------------------------------------------------------------
@@ -89,18 +90,23 @@ void main(uint3 DTid : SV_DispatchThreadID)
 		// Compute divergence
 		const float b = GetDivergence(g_txVelocity, cells);
 
+#if 0
 		// Boundary process
-		int3 offset;
-		offset.x = DTid.x + 2 >= gridSize.x ? -1 : (DTid.x < 2 ? 1 : 0);
-		offset.y = DTid.y + 2 >= gridSize.y ? -1 : (DTid.y < 2 ? 1 : 0);
-		offset.z = DTid.z + 2 >= gridSize.z ? -1 : (DTid.z < 2 ? 1 : 0);
+		const int3 offset = DTid + 2 >= gridSize ? -1 : (DTid < 2 ? 1 : 0);
 		if (any(offset)) u = -g_txVelocity[DTid + offset];
+#endif
 
 		// Poisson solver
 		Poisson(g_rwIncompress, b, DTid, cells);
 
 		// Projection
 		Project(g_rwIncompress, u, cells);
+
+		// Boundary process
+		float3 pos = GridToSimulationSpace(DTid, gridSize);
+		pos = pos * 2.0 - 1.0;
+		u *= u * pos > 0.0 ? clamp((0.97 - abs(pos)) / 0.03, -1.0, 1.0) : 1.0;
+		//u = u * pos > 0.0 && abs(pos) > 0.95 ? -u : u;
 	}
 
 	g_rwVelocity[DTid] = u;

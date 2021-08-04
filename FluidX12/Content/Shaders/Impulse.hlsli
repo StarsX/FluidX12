@@ -16,11 +16,3 @@ static const float	g_impulseR = 1.0 / 28.0;
 static const float3	g_impulseColor = { 0.2, 0.4, 1.0 };
 static const float	g_impulseDensity = 32.0;
 static const float4	g_impulse = float4(g_impulseColor, 1.0) * g_impulseDensity;
-
-//--------------------------------------------------------------------------------------
-// Grid space to simulation space
-//--------------------------------------------------------------------------------------
-float3 SimulationToTextureSpace(float3 pos, float3 gridSize)
-{
-	return pos;
-}

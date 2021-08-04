@@ -116,8 +116,9 @@ protected:
 	DirectX::XMFLOAT3X4		m_volumeWorld;
 	DirectX::XMFLOAT3X4		m_lightMapWorld;
 
+	uint32_t				m_numParticles;
+	uint8_t					m_frameParity;
+
 	float					m_timeStep;
 	float					m_timeInterval;
-	uint8_t					m_frameParity;
-	uint32_t				m_numParticles;
 };
