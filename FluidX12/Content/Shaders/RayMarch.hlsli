@@ -4,18 +4,25 @@
 
 #include "RayCast.hlsli"
 
-#define NUM_SAMPLES			256
-#define NUM_LIGHT_SAMPLES	64
 #define ABSORPTION			1.0
 #define ZERO_THRESHOLD		0.01
 #define ONE_THRESHOLD		0.99
 
 //--------------------------------------------------------------------------------------
+// Constant buffer
+//--------------------------------------------------------------------------------------
+cbuffer cbSampleRes
+{
+	uint g_numSamples;
+	uint g_numLightSamples; // Only for non-light-separate paths, which need both view and light ray samples
+};
+
+//--------------------------------------------------------------------------------------
 // Constants
 //--------------------------------------------------------------------------------------
 static const min16float g_maxDist = 2.0 * sqrt(3.0);
-static const min16float g_stepScale = g_maxDist / NUM_SAMPLES;
-static const min16float g_lightStepScale = g_maxDist / NUM_LIGHT_SAMPLES;
+static const min16float g_stepScale = g_maxDist / min16float(g_numSamples);
+static const min16float g_lightStepScale = g_maxDist / min16float(g_numLightSamples);
 
 //--------------------------------------------------------------------------------------
 // Textures
@@ -41,6 +48,9 @@ min16float4 GetSample(float3 uvw)
 {
 	min16float4 color = min16float4(g_txGrid.SampleLevel(g_smpLinear, uvw, 0.0));
 	//min16float4 color = min16float4(0.0, 0.5, 1.0, 0.5);
+#ifdef _PRE_MULTIPLIED_
+	color.xyz *= DENSITY_SCALE;
+#endif
 	color.w *= DENSITY_SCALE;
 
 	return color;
@@ -53,6 +63,16 @@ min16float GetOpacity(min16float density, min16float stepScale)
 {
 	return saturate(density * stepScale * ABSORPTION * 4.0);
 }
+
+//--------------------------------------------------------------------------------------
+// Get opacity
+//--------------------------------------------------------------------------------------
+#ifdef _PRE_MULTIPLIED_
+min16float3 GetPremultiplied(min16float3 color, min16float stepScale)
+{
+	return color * saturate(stepScale * ABSORPTION * 4.0);
+}
+#endif
 
 //--------------------------------------------------------------------------------------
 // Get occluded end point
@@ -135,7 +155,7 @@ float3 LocalToTex3DSpace(float3 pos)
 #ifdef _LIGHT_PASS_
 float3 GetLight(float3 pos, float3 step)
 {
-	const float3 uvw = (pos + step) * 0.5 + 0.5;
+	const float3 uvw = pos * 0.5 + 0.5;
 
 	return g_txLightMap.SampleLevel(g_smpLinear, uvw, 0.0);
 }
@@ -151,7 +171,7 @@ float3 GetLight(float3 pos, float3 step)
 
 	if (shadow > 0.0)
 	{
-		for (uint i = 0; i < NUM_LIGHT_SAMPLES; ++i)
+		for (uint i = 0; i < g_numLightSamples; ++i)
 		{
 			// Update position along light ray
 			pos += step;

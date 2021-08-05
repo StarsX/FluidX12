@@ -31,6 +31,8 @@ const float g_zFar = 1000.0f;
 FluidX::FluidX(uint32_t width, uint32_t height, std::wstring name) :
 	DXFramework(width, height, name),
 	m_frameIndex(0),
+	m_maxRaySamples(256),
+	m_maxLightSamples(64),
 	m_showFPS(true),
 	m_isPaused(false),
 	m_tracking(false),
@@ -151,6 +153,7 @@ void FluidX::LoadAssets()
 	if (!m_fluid->Init(pCommandList, m_width, m_height, m_descriptorTableCache, uploaders,
 		Format::B8G8R8A8_UNORM, Format::D24_UNORM_S8_UINT, m_gridSize, m_numParticles))
 		ThrowIfFailed(E_FAIL);
+	m_fluid->SetMaxSamples(m_maxRaySamples, m_maxLightSamples);
 
 	// Close the command list and execute it to begin the initial GPU setup.
 	N_RETURN(pCommandList->Close(), ThrowIfFailed(E_FAIL));
@@ -334,6 +337,16 @@ void FluidX::ParseCommandLineArgs(wchar_t* argv[], int argc)
 			_wcsnicmp(argv[i], L"/particles", wcslen(argv[i])) == 0)
 		{
 			m_numParticles = ++i < argc ? static_cast<uint32_t>(_wtof(argv[i])) : m_numParticles;
+		}
+		else if (_wcsnicmp(argv[i], L"-maxRaySamples", wcslen(argv[i])) == 0 ||
+			_wcsnicmp(argv[i], L"/maxRaySamples", wcslen(argv[i])) == 0)
+		{
+			m_maxRaySamples = ++i < argc ? _wtoi(argv[i]) : m_maxRaySamples;
+		}
+		else if (_wcsnicmp(argv[i], L"-maxLightSamples", wcslen(argv[i])) == 0 ||
+			_wcsnicmp(argv[i], L"/maxLightSamples", wcslen(argv[i])) == 0)
+		{
+			m_maxLightSamples = ++i < argc ? _wtoi(argv[i]) : m_maxLightSamples;
 		}
 	}
 }

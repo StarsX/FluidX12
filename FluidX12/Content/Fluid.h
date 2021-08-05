@@ -24,6 +24,7 @@ public:
 		std::vector<XUSG::Resource::uptr>& uploaders, XUSG::Format rtFormat, XUSG::Format dsFormat,
 		const DirectX::XMUINT3& gridSize, uint32_t numParticles = 0);
 
+	void SetMaxSamples(uint32_t maxRaySamples, uint32_t maxLightSamples);
 	void UpdateFrame(float timeStep, uint8_t frameIndex, const DirectX::XMFLOAT4X4& view,
 		const DirectX::XMFLOAT4X4& proj, const DirectX::XMFLOAT3& eyePt);
 	void Simulate(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
@@ -116,6 +117,8 @@ protected:
 	DirectX::XMFLOAT3X4		m_volumeWorld;
 	DirectX::XMFLOAT3X4		m_lightMapWorld;
 
+	uint32_t				m_maxRaySamples;
+	uint32_t				m_maxLightSamples;
 	uint32_t				m_numParticles;
 	uint8_t					m_frameParity;
 

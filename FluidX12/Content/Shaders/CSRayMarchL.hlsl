@@ -50,8 +50,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 	if (shadow > 0.0)
 	{
-		float t = 0.0;
-		for (uint i = 0; i < NUM_LIGHT_SAMPLES; ++i)
+		float t = g_stepScale;
+		for (uint i = 0; i < g_numSamples; ++i)
 		{
 			const float3 pos = rayOrigin.xyz + rayDir * t;
 			if (any(abs(pos) > 1.0)) break;
@@ -61,11 +61,11 @@ void main(uint3 DTid : SV_DispatchThreadID)
 			const min16float density = GetSample(uvw).w;
 
 			// Attenuate ray-throughput along light direction
-			shadow *= 1.0 - GetOpacity(density, g_lightStepScale);
+			shadow *= 1.0 - GetOpacity(density, g_stepScale);
 			if (shadow < ZERO_THRESHOLD) break;
 
 			// Update position along light ray
-			t += g_lightStepScale;
+			t += g_stepScale;
 		}
 	}
 
