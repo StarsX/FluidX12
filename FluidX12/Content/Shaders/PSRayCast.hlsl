@@ -69,7 +69,7 @@ min16float4 main(PSIn input) : SV_TARGET
 	min16float3 scatter = 0.0;
 
 	float t = 0.0;
-	for (uint i = 0; i < NUM_SAMPLES; ++i)
+	for (uint i = 0; i < g_numSamples; ++i)
 	{
 		const float3 pos = rayOrigin + rayDir * t;
 		if (any(abs(pos) > 1.0)) break;
@@ -91,7 +91,9 @@ min16float4 main(PSIn input) : SV_TARGET
 			// Accumulate color
 			color.w = GetOpacity(color.w, g_stepScale);
 			color.xyz *= transm;
-#ifndef _PRE_MULTIPLIED_
+#ifdef _PRE_MULTIPLIED_
+			color.xyz = GetPremultiplied(color.xyz, g_stepScale);
+#else
 			color.xyz *= color.w;
 #endif
 

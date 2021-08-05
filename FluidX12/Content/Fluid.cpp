@@ -34,11 +34,13 @@ struct CBPerObjectGrid3D
 
 Fluid::Fluid(const Device::sptr& device) :
 	m_device(device),
-	m_frameParity(0),
-	m_timeInterval(0.0f),
 	m_lightPt(75.0f, 75.0f, -75.0f),
 	m_lightColor(1.0f, 0.7f, 0.3f, XM_PI),
-	m_ambient(1.0f, 1.0f, 1.0f, XM_PI * 0.1f)
+	m_ambient(1.0f, 1.0f, 1.0f, XM_PI * 0.1f),
+	m_maxRaySamples(256),
+	m_maxLightSamples(64),
+	m_frameParity(0),
+	m_timeInterval(0.0f)
 {
 	m_shaderPool = ShaderPool::MakeUnique();
 	m_graphicsPipelineCache = Graphics::PipelineCache::MakeUnique(device.get());
@@ -135,6 +137,12 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 	N_RETURN(createDescriptorTables(), false);
 
 	return true;
+}
+
+void Fluid::SetMaxSamples(uint32_t maxRaySamples, uint32_t maxLightSamples)
+{
+	m_maxRaySamples = maxRaySamples;
+	m_maxLightSamples = maxLightSamples;
 }
 
 void Fluid::UpdateFrame(float timeStep, uint8_t frameIndex,
@@ -315,12 +323,13 @@ bool Fluid::createPipelineLayouts()
 	}
 	else if (m_gridSize.z > 1)
 	{
+		// Ray casting
 		{
-			// Ray casting
 			const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
 			pipelineLayout->SetRootCBV(0, 0, 0, Shader::Stage::PS);
 			pipelineLayout->SetRange(1, DescriptorType::SRV, 1, 0);
 			pipelineLayout->SetRange(2, DescriptorType::SAMPLER, 1, 0);
+			pipelineLayout->SetConstants(3, 2, 1, 0, Shader::Stage::PS);
 			pipelineLayout->SetShaderStage(0, Shader::Stage::PS);
 			pipelineLayout->SetShaderStage(1, Shader::Stage::PS);
 			pipelineLayout->SetShaderStage(2, Shader::Stage::PS);
@@ -335,6 +344,7 @@ bool Fluid::createPipelineLayouts()
 			pipelineLayout->SetRange(1, DescriptorType::SRV, 1, 0);
 			pipelineLayout->SetRange(2, DescriptorType::UAV, 1, 0, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
 			pipelineLayout->SetRange(3, DescriptorType::SAMPLER, 1, 0);
+			pipelineLayout->SetConstants(4, 1, 1);
 			X_RETURN(m_pipelineLayouts[RAY_MARCH_L], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 				PipelineLayoutFlag::NONE, L"LightSpaceRayMarchingLayout"), false);
 		}
@@ -345,6 +355,7 @@ bool Fluid::createPipelineLayouts()
 			pipelineLayout->SetRootCBV(0, 0, 0, Shader::Stage::PS);
 			pipelineLayout->SetRange(1, DescriptorType::SRV, 2, 0);
 			pipelineLayout->SetRange(2, DescriptorType::SAMPLER, 1, 0);
+			pipelineLayout->SetConstants(3, 1, 1, 0, Shader::Stage::PS);
 			pipelineLayout->SetShaderStage(0, Shader::Stage::PS);
 			pipelineLayout->SetShaderStage(1, Shader::Stage::PS);
 			pipelineLayout->SetShaderStage(2, Shader::Stage::PS);
@@ -589,6 +600,8 @@ void Fluid::rayCast(const CommandList* pCommandList, uint8_t frameIndex)
 	pCommandList->SetGraphicsRootConstantBufferView(0, m_cbPerObject.get(), m_cbPerObject->GetCBVOffset(frameIndex));
 	pCommandList->SetGraphicsDescriptorTable(1, m_srvUavTables[SRV_TABLE_RAY_MARCH + !m_frameParity]);
 	pCommandList->SetGraphicsDescriptorTable(2, m_samplerTables[SAMPLER_TABLE_CLAMP]);
+	pCommandList->SetGraphics32BitConstant(3, m_maxRaySamples);
+	pCommandList->SetGraphics32BitConstant(3, m_maxLightSamples, 1);
 
 	pCommandList->Draw(3, 1, 0, 0);
 }
@@ -608,6 +621,7 @@ void Fluid::rayMarchL(const CommandList* pCommandList, uint8_t frameIndex)
 	pCommandList->SetComputeDescriptorTable(1, m_srvUavTables[SRV_TABLE_RAY_MARCH + !m_frameParity]);
 	pCommandList->SetComputeDescriptorTable(2, m_srvUavTables[UAV_TABLE_LIGHT_MAP]);
 	pCommandList->SetComputeDescriptorTable(3, m_samplerTables[SAMPLER_TABLE_CLAMP]);
+	pCommandList->SetCompute32BitConstant(4, m_maxLightSamples);
 
 	// Dispatch grid
 	pCommandList->Dispatch(DIV_UP(m_lightMapSize.x, 4), DIV_UP(m_lightMapSize.y, 4), DIV_UP(m_lightMapSize.z, 4));
@@ -630,6 +644,7 @@ void Fluid::rayMarchV(const CommandList* pCommandList, uint8_t frameIndex)
 	pCommandList->SetGraphicsRootConstantBufferView(0, m_cbPerObject.get(), m_cbPerObject->GetCBVOffset(frameIndex));
 	pCommandList->SetGraphicsDescriptorTable(1, m_srvUavTables[SRV_TABLE_RAY_MARCH + !m_frameParity]);
 	pCommandList->SetGraphicsDescriptorTable(2, m_samplerTables[SAMPLER_TABLE_CLAMP]);
+	pCommandList->SetGraphics32BitConstant(3, m_maxRaySamples);
 
 	pCommandList->Draw(3, 1, 0, 0);
 }
