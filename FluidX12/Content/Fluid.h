@@ -106,6 +106,7 @@ protected:
 	XUSG::StructuredBuffer::uptr m_particleBuffer;
 
 	XUSG::ConstantBuffer::uptr m_cbPerFrame;
+	XUSG::ConstantBuffer::uptr m_cbPerFrameGrid3D;
 	XUSG::ConstantBuffer::uptr m_cbPerObject;
 
 	DirectX::XMFLOAT3		m_lightPt;
