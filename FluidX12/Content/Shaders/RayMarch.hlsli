@@ -155,6 +155,7 @@ float3 LocalToTex3DSpace(float3 pos)
 #ifdef _LIGHT_PASS_
 float3 GetLight(float3 pos, float3 step)
 {
+	pos = mul(float4(pos, 1.0), g_localToLight);
 	const float3 uvw = pos * 0.5 + 0.5;
 
 	return g_txLightMap.SampleLevel(g_smpLinear, uvw, 0.0);
