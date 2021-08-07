@@ -164,7 +164,7 @@ void Fluid::UpdateFrame(float timeStep, uint8_t frameIndex,
 		pCbData->BaseSeed = rand();
 	}
 
-	if (m_gridSize.z > 1)
+	if (m_gridSize.z > 1 && m_numParticles <= 0)
 	{
 		const auto pCbData = reinterpret_cast<CBPerFrameGrid3D*>(m_cbPerFrameGrid3D->Map(frameIndex));
 		pCbData->EyePos = XMFLOAT4(eyePt.x, eyePt.y, eyePt.z, 1.0f);
@@ -512,9 +512,16 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 
 bool Fluid::createDescriptorTables()
 {
-	// Create CBV tables
-	if (m_gridSize.z > 1)
+	if (m_numParticles > 0)
 	{
+		// Create particle UAV
+		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+		descriptorTable->SetDescriptors(0, 1, &m_particleBuffer->GetUAV());
+		X_RETURN(m_srvUavTables[UAV_SRV_TABLE_PARTICLE], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+	}
+	else if (m_gridSize.z > 1)
+	{
+		// Create CBV tables
 		for (uint8_t i = 0; i < FrameCount; ++i)
 		{
 			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
@@ -526,14 +533,6 @@ bool Fluid::createDescriptorTables()
 			descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
 			X_RETURN(m_cbvTables[i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 		}
-	}
-
-	if (m_numParticles > 0)
-	{
-		// Create particle UAV
-		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
-		descriptorTable->SetDescriptors(0, 1, &m_particleBuffer->GetUAV());
-		X_RETURN(m_srvUavTables[UAV_SRV_TABLE_PARTICLE], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 	}
 
 	// Create SRV and UAV tables
