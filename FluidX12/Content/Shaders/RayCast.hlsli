@@ -12,6 +12,13 @@
 //--------------------------------------------------------------------------------------
 // Constant buffers
 //--------------------------------------------------------------------------------------
+cbuffer cbPerObject
+{
+	matrix g_worldViewProjI;
+	float4x3 g_worldI;
+	float4x3 g_localToLight;
+};
+
 cbuffer cbPerFrame
 {
 	float3 g_eyePt;
@@ -19,13 +26,6 @@ cbuffer cbPerFrame
 	float3 g_lightPt;
 	float4 g_lightColor;
 	float4 g_ambient;
-};
-
-cbuffer cbPerObject
-{
-	matrix g_worldViewProjI;
-	float4x3 g_worldI;
-	float4x3 g_localToLight;
 };
 
 //--------------------------------------------------------------------------------------
