@@ -75,46 +75,44 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 		m_velocities[i] = Texture3D::MakeUnique();
 		N_RETURN(m_velocities[i]->Create(m_device.get(), gridSize.x, gridSize.y, gridSize.z, Format::R16G16B16A16_FLOAT,
 			i ? ResourceFlag::ALLOW_UNORDERED_ACCESS : (ResourceFlag::ALLOW_UNORDERED_ACCESS |
-				ResourceFlag::ALLOW_SIMULTANEOUS_ACCESS), 1, MemoryType::DEFAULT,
+				ResourceFlag::ALLOW_SIMULTANEOUS_ACCESS), 1, MemoryFlag::NONE,
 				(L"Velocity" + to_wstring(i)).c_str()), false);
 
 		m_colors[i] = Texture3D::MakeUnique();
 		N_RETURN(m_colors[i]->Create(m_device.get(), gridSize.x, gridSize.y, gridSize.z, Format::R16G16B16A16_FLOAT,
-			ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryType::DEFAULT,
-			(L"Color" + to_wstring(i)).c_str()), false);
+			ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryFlag::NONE, (L"Color" + to_wstring(i)).c_str()), false);
 	}
 
 	m_incompress = Texture3D::MakeUnique();
 	N_RETURN(m_incompress->Create(m_device.get(), gridSize.x, gridSize.y, gridSize.z, Format::R32_FLOAT,
-		ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryType::DEFAULT,
-		L"Incompressibility"), false);
+		ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryFlag::NONE, L"Incompressibility"), false);
 
 	m_lightMapSize = gridSize;
 	m_lightMap = Texture3D::MakeUnique();
 	N_RETURN(m_lightMap->Create(m_device.get(), m_lightMapSize.x, m_lightMapSize.y, m_lightMapSize.z,
 		Format::R11G11B10_FLOAT, ResourceFlag::ALLOW_UNORDERED_ACCESS | ResourceFlag::ALLOW_SIMULTANEOUS_ACCESS,
-		1, MemoryType::DEFAULT, L"LightMap"), false);
+		1, MemoryFlag::NONE, L"LightMap"), false);
 
 	// Create constant buffers
 	m_cbPerFrame = ConstantBuffer::MakeUnique();
 	N_RETURN(m_cbPerFrame->Create(m_device.get(), sizeof(CBPerFrame[FrameCount]), FrameCount,
-		nullptr, MemoryType::UPLOAD, L"CBPerFrame"), false);
+		nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"CBPerFrame"), false);
 
 	if (m_numParticles > 0)
 	{
 		m_cbPerObject = ConstantBuffer::MakeUnique();
 		N_RETURN(m_cbPerObject->Create(m_device.get(), sizeof(CBPerObjectParticle[FrameCount]), FrameCount,
-			nullptr, MemoryType::UPLOAD, L"CBPerObjectParticle"), false);
+			nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"CBPerObjectParticle"), false);
 	}
 	else if (m_gridSize.z > 1)
 	{
 		m_cbPerFrameGrid3D = ConstantBuffer::MakeUnique();
 		N_RETURN(m_cbPerFrameGrid3D->Create(m_device.get(), sizeof(CBPerFrameGrid3D[FrameCount]), FrameCount,
-			nullptr, MemoryType::UPLOAD, L"CBPerFrameGrid3D"), false);
+			nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"CBPerFrameGrid3D"), false);
 
 		m_cbPerObject = ConstantBuffer::MakeUnique();
 		N_RETURN(m_cbPerObject->Create(m_device.get(), sizeof(CBPerObjectGrid3D[FrameCount]), FrameCount,
-			nullptr, MemoryType::UPLOAD, L"CBPerObjectGrid3D"), false);
+			nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"CBPerObjectGrid3D"), false);
 	}
 
 	ResourceBarrier barrier;
@@ -126,7 +124,7 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 		m_particleBuffer = StructuredBuffer::MakeUnique();
 		N_RETURN(m_particleBuffer->Create(m_device.get(), numParticles, sizeof(ParticleInfo),
 			ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT, 1, nullptr, 1,
-			nullptr, L"ParticleBuffer"), false);
+			nullptr, MemoryFlag::NONE, L"ParticleBuffer"), false);
 
 		vector<ParticleInfo> particles(numParticles);
 		for (auto& particle : particles)
