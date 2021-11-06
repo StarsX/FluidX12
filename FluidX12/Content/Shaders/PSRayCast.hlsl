@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------------------
-// Copyright (c) XU, Tianchen. All rights reserved.
+// Copyright (c) XU, Tianchen & ZENG, Wei. All rights reserved.
 //--------------------------------------------------------------------------------------
 
 #include "RayMarch.hlsli"

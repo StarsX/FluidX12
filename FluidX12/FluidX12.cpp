@@ -9,24 +9,26 @@
 //
 //*********************************************************
 
+#include "SharedConsts.h"
 #include "FluidX12.h"
 
 using namespace std;
 using namespace XUSG;
 
-
 enum RenderMethod
 {
 	RAY_MARCH_MERGED,
 	RAY_MARCH_SEPARATE,
+	RAY_MARCH_DIRECT_MERGED,
+	RAY_MARCH_DIRECT_SEPARATE,
 
 	NUM_RENDER_METHOD
 };
-RenderMethod g_renderMethod = RAY_MARCH_SEPARATE;
 
+RenderMethod g_renderMethod = RAY_MARCH_SEPARATE;
 const float g_FOVAngleY = XM_PIDIV4;
-const float g_zNear = 1.0f;
-const float g_zFar = 1000.0f;
+const auto g_rtFormat = Format::B8G8R8A8_UNORM;
+const auto g_dsFormat = Format::D24_UNORM_S8_UINT;
 
 FluidX::FluidX(uint32_t width, uint32_t height, std::wstring name) :
 	DXFramework(width, height, name),
@@ -37,7 +39,8 @@ FluidX::FluidX(uint32_t width, uint32_t height, std::wstring name) :
 	m_isPaused(false),
 	m_tracking(false),
 	m_gridSize(128, 128, 128),
-	m_numParticles(0)
+	m_numParticles(0),
+	m_radianceFile(L"")
 {
 #if defined (_DEBUG)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -111,7 +114,7 @@ void FluidX::LoadPipeline()
 	// Describe and create the swap chain.
 	m_swapChain = SwapChain::MakeUnique();
 	N_RETURN(m_swapChain->Create(factory.get(), Win32Application::GetHwnd(), m_commandQueue.get(),
-		FrameCount, m_width, m_height, Format::B8G8R8A8_UNORM), ThrowIfFailed(E_FAIL));
+		FrameCount, m_width, m_height, g_rtFormat), ThrowIfFailed(E_FAIL));
 
 	// This sample does not support fullscreen transitions.
 	ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_NO_ALT_ENTER));
@@ -134,9 +137,8 @@ void FluidX::LoadPipeline()
 
 	// Create output views
 	m_depth = DepthStencil::MakeUnique();
-	m_depth->Create(m_device.get(), m_width, m_height, Format::D24_UNORM_S8_UINT,
-		ResourceFlag::DENY_SHADER_RESOURCE, 1, 1, 1, 1.0f, 0, false,
-		MemoryFlag::NONE, L"Depth");
+	m_depth->Create(m_device.get(), m_width, m_height, g_dsFormat,
+		ResourceFlag::DENY_SHADER_RESOURCE, 1, 1, 1, 1.0f, 0, false, MemoryFlag::NONE, L"Depth");
 }
 
 // Load the sample assets.
@@ -149,6 +151,15 @@ void FluidX::LoadAssets()
 		m_commandAllocators[m_frameIndex].get(), nullptr), ThrowIfFailed(E_FAIL));
 
 	vector<Resource::uptr> uploaders(0);
+
+	if (!m_radianceFile.empty())
+	{
+		X_RETURN(m_lightProbe, make_unique<LightProbe>(m_device), ThrowIfFailed(E_FAIL));
+		N_RETURN(m_lightProbe->Init(pCommandList, m_descriptorTableCache, uploaders,
+			m_radianceFile.c_str(), g_rtFormat, g_dsFormat), ThrowIfFailed(E_FAIL));
+		N_RETURN(m_lightProbe->CreateDescriptorTables(), ThrowIfFailed(E_FAIL));
+	}
+
 	// Create fast hybrid fluid simulator
 	m_fluid = make_unique<Fluid>(m_device);
 	if (!m_fluid) ThrowIfFailed(E_FAIL);
@@ -203,16 +214,15 @@ void FluidX::OnUpdate()
 	float timeStep;
 	const auto totalTime = CalculateFrameStats(&timeStep);
 	pauseTime = m_isPaused ? totalTime - time : pauseTime;
-	//timeStep = (max)(timeStep, (m_gridSize.z > 1 ? 2.0f : 1.0f) / m_gridSize.y);
 	timeStep = (m_gridSize.z > 1 ? 2.0f : 1.0f) / m_gridSize.y;
 	timeStep = m_isPaused ? 0.0f : timeStep;
 	time = totalTime - pauseTime;
 
 	// View
-	//const auto eyePt = XMLoadFloat3(&m_eyePt);
-	//const auto view = XMLoadFloat4x4(&m_view);
-	//const auto proj = XMLoadFloat4x4(&m_proj);
-	//const auto viewProj = view * proj;
+	const auto view = XMLoadFloat4x4(&m_view);
+	const auto proj = XMLoadFloat4x4(&m_proj);
+	const auto viewProj = view * proj;
+	if (m_lightProbe) m_lightProbe->UpdateFrame(m_frameIndex, viewProj, m_eyePt);
 	m_fluid->UpdateFrame(timeStep, m_frameIndex, m_view, m_proj, m_eyePt);
 }
 
@@ -350,6 +360,11 @@ void FluidX::ParseCommandLineArgs(wchar_t* argv[], int argc)
 		{
 			m_maxLightSamples = ++i < argc ? _wtoi(argv[i]) : m_maxLightSamples;
 		}
+		else if (_wcsnicmp(argv[i], L"-radiance", wcslen(argv[i])) == 0 ||
+			_wcsnicmp(argv[i], L"/radiance", wcslen(argv[i])) == 0)
+		{
+			m_radianceFile = i + 1 < argc ? argv[++i] : m_radianceFile;
+		}
 	}
 }
 
@@ -375,6 +390,17 @@ void FluidX::PopulateCommandList()
 	};
 	pCommandList->SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
 
+	if (m_lightProbe)
+	{
+		static auto isFirstFrame = true;
+		if (isFirstFrame)
+		{
+			m_lightProbe->Process(pCommandList, m_frameIndex);
+			m_fluid->SetSH(m_lightProbe->GetSH());
+			isFirstFrame = false;
+		}
+	}
+
 	// Fluid simulation
 	m_fluid->Simulate(pCommandList, m_frameIndex);
 
@@ -395,12 +421,19 @@ void FluidX::PopulateCommandList()
 	pCommandList->RSSetViewports(1, &viewport);
 	pCommandList->RSSetScissorRects(1, &scissorRect);
 
+	if (m_lightProbe) m_lightProbe->RenderEnvironment(pCommandList, m_frameIndex);
 	switch (g_renderMethod)
 	{
 	case RAY_MARCH_MERGED:
-		m_fluid->Render(pCommandList, m_frameIndex, Fluid::RAY_MARCH_DIRECT);
+		m_fluid->Render(pCommandList, m_frameIndex, Fluid::RAY_MARCH_CUBEMAP);
 		break;
 	case RAY_MARCH_SEPARATE:
+		m_fluid->Render(pCommandList, m_frameIndex, Fluid::OPTIMIZED);
+		break;
+	case RAY_MARCH_DIRECT_MERGED:
+		m_fluid->Render(pCommandList, m_frameIndex, Fluid::RAY_MARCH_DIRECT);
+		break;
+	case RAY_MARCH_DIRECT_SEPARATE:
 		m_fluid->Render(pCommandList, m_frameIndex, Fluid::SEPARATE_LIGHT_PASS);
 		break;
 	default:
@@ -472,13 +505,20 @@ double FluidX::CalculateFrameStats(float* pTimeStep)
 		if (m_showFPS) windowText << setprecision(2) << fixed << fps;
 		else windowText << L"[F1]";
 		windowText << "  ";
+		windowText << L"    [\x2190][\x2192] ";
 		switch (g_renderMethod)
 		{
 		case RAY_MARCH_MERGED:
-			windowText << L"Ray marching without separate lighting pass";
+			windowText << L"Cubemap-space ray marching without separate lighting pass";
 			break;
 		case RAY_MARCH_SEPARATE:
-			windowText << L"Ray marching with separate lighting pass";
+			windowText << L"Cubemap-space ray marching with separate lighting pass";
+			break;
+		case RAY_MARCH_DIRECT_MERGED:
+			windowText << L"Direct screen-space ray marching without separate lighting pass";
+			break;
+		case RAY_MARCH_DIRECT_SEPARATE:
+			windowText << L"Direct screen-space ray marching with separate lighting pass";
 			break;
 		default:
 			windowText << L"Simple particle rendering";
