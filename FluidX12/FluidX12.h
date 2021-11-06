@@ -84,7 +84,6 @@ private:
 
 	// User external settings
 	XMUINT3 m_gridSize;
-	uint32_t m_numParticles;
 
 	std::wstring m_radianceFile;
 

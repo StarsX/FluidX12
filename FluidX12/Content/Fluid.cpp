@@ -12,20 +12,13 @@ using namespace std;
 using namespace DirectX;
 using namespace XUSG;
 
-struct CBPerFrame
+struct CBSimulation
 {
 	float TimeStep;
 	uint32_t BaseSeed;
 };
 
-struct CBPerObjectParticle
-{
-	XMFLOAT3X4 WorldView;
-	XMFLOAT3X4 WorldViewI;
-	XMFLOAT4X4 Proj;
-};
-
-struct CBPerFrameGrid3D
+struct CBPerFrame
 {
 	XMFLOAT4 EyePos;
 	XMFLOAT3X4 LightMapWorld;
@@ -35,7 +28,7 @@ struct CBPerFrameGrid3D
 	XMFLOAT4 Ambient;
 };
 
-struct CBPerObjectGrid3D
+struct CBPerObject
 {
 	XMFLOAT4X4 WorldViewProjI;
 	XMFLOAT4X4 WorldViewProj;
@@ -205,12 +198,11 @@ Fluid::~Fluid()
 
 bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 	const DescriptorTableCache::sptr& descriptorTableCache, vector<Resource::uptr>& uploaders,
-	Format rtFormat, Format dsFormat, const XMUINT3& gridSize, uint32_t numParticles)
+	Format rtFormat, Format dsFormat, const XMUINT3& gridSize)
 {
 	m_viewport = XMUINT2(width, height);
 	m_descriptorTableCache = descriptorTableCache;
 	m_gridSize = gridSize;
-	m_numParticles = numParticles;
 	assert(m_gridSize.x == m_gridSize.y);
 
 	// Create resources
@@ -249,25 +241,19 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 		//ResourceFlag::ALLOW_UNORDERED_ACCESS, numMips, 1, MemoryFlag::NONE, true, L"CubeDepth"), false);
 
 	// Create constant buffers
-	m_cbPerFrame = ConstantBuffer::MakeUnique();
-	N_RETURN(m_cbPerFrame->Create(m_device.get(), sizeof(CBPerFrame[FrameCount]), FrameCount,
-		nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"CBPerFrame"), false);
+	m_cbSimulation = ConstantBuffer::MakeUnique();
+	N_RETURN(m_cbSimulation->Create(m_device.get(), sizeof(CBSimulation[FrameCount]), FrameCount,
+		nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"Fluid.CBSimulation"), false);
 
-	if (m_numParticles > 0)
+	if (m_gridSize.z > 1)
 	{
-		m_cbPerObject = ConstantBuffer::MakeUnique();
-		N_RETURN(m_cbPerObject->Create(m_device.get(), sizeof(CBPerObjectParticle[FrameCount]), FrameCount,
-			nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"CBPerObjectParticle"), false);
-	}
-	else if (m_gridSize.z > 1)
-	{
-		m_cbPerFrameGrid3D = ConstantBuffer::MakeUnique();
-		N_RETURN(m_cbPerFrameGrid3D->Create(m_device.get(), sizeof(CBPerFrameGrid3D[FrameCount]), FrameCount,
-			nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"CBPerFrameGrid3D"), false);
+		m_cbPerFrame = ConstantBuffer::MakeUnique();
+		N_RETURN(m_cbPerFrame->Create(m_device.get(), sizeof(CBPerFrame[FrameCount]), FrameCount,
+			nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"Fluid.CBPerFrame"), false);
 
 		m_cbPerObject = ConstantBuffer::MakeUnique();
-		N_RETURN(m_cbPerObject->Create(m_device.get(), sizeof(CBPerObjectGrid3D[FrameCount]), FrameCount,
-			nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"CBPerObjectGrid3D"), false);
+		N_RETURN(m_cbPerObject->Create(m_device.get(), sizeof(CBPerObject[FrameCount]), FrameCount,
+			nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"Fluid.CBPerObject"), false);
 	}
 
 #if _CPU_CUBE_FACE_CULL_ == 2
@@ -279,25 +265,6 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 	ResourceBarrier barrier;
 	const auto numBarriers = m_incompress->SetBarrier(&barrier, ResourceState::UNORDERED_ACCESS);
 	pCommandList->Barrier(numBarriers, &barrier);
-
-	if (numParticles > 0)
-	{
-		m_particleBuffer = StructuredBuffer::MakeUnique();
-		N_RETURN(m_particleBuffer->Create(m_device.get(), numParticles, sizeof(ParticleInfo),
-			ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT, 1, nullptr, 1,
-			nullptr, MemoryFlag::NONE, L"ParticleBuffer"), false);
-
-		vector<ParticleInfo> particles(numParticles);
-		for (auto& particle : particles)
-		{
-			particle = {};
-			particle.Pos.y = FLT_MAX;
-			particle.LifeTime = rand() % numParticles / 10000.0f;
-		}
-		uploaders.emplace_back(Resource::MakeUnique());
-		m_particleBuffer->Upload(pCommandList, uploaders.back().get(), particles.data(),
-			sizeof(ParticleInfo) * numParticles);
-	}
 
 	// Create pipelines
 	N_RETURN(createPipelineLayouts(), false);
@@ -321,41 +288,24 @@ void Fluid::SetSH(const StructuredBuffer::sptr& coeffSH)
 void Fluid::UpdateFrame(float timeStep, uint8_t frameIndex,
 	const XMFLOAT4X4& view, const XMFLOAT4X4& proj, const XMFLOAT3& eyePt)
 {
-	// Per-frame
+	// Per-frame for simulation
 	{
-		const auto pCbData = reinterpret_cast<CBPerFrame*>(m_cbPerFrame->Map(frameIndex));
+		const auto pCbData = reinterpret_cast<CBSimulation*>(m_cbSimulation->Map(frameIndex));
 		pCbData->TimeStep = timeStep;
 		pCbData->BaseSeed = rand();
 	}
 
-	// Per-object
+	// Per-object for simulation
 	const auto world = XMLoadFloat3x4(&m_volumeWorld);
 
-	if (m_numParticles > 0)
-	{
-		XMMATRIX worldView;
-		const auto pCbData = reinterpret_cast<CBPerObjectParticle*>(m_cbPerObject->Map(frameIndex));
-		if (m_gridSize.z > 1)
-		{
-			worldView = world * XMLoadFloat4x4(&view);
-			XMStoreFloat4x4(&pCbData->Proj, XMMatrixTranspose(XMLoadFloat4x4(&proj)));
-		}
-		else
-		{
-			worldView = world;
-			XMStoreFloat4x4(&pCbData->Proj, XMMatrixScaling(0.1f, 0.1f, 0.1f));
-		}
-
-		XMStoreFloat3x4(&pCbData->WorldView, worldView);
-		XMStoreFloat3x4(&pCbData->WorldViewI, XMMatrixInverse(nullptr, worldView));
-	}
-	else if (m_gridSize.z > 1)
+	// For Visualization
+	if (m_gridSize.z > 1)
 	{
 		const auto viewProj = XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj);
 
 		// Per-frame
 		{
-			const auto pCbData = reinterpret_cast<CBPerFrameGrid3D*>(m_cbPerFrameGrid3D->Map(frameIndex));
+			const auto pCbData = reinterpret_cast<CBPerFrame*>(m_cbPerFrame->Map(frameIndex));
 			pCbData->EyePos = XMFLOAT4(eyePt.x, eyePt.y, eyePt.z, 1.0f);
 			pCbData->LightMapWorld = m_lightMapWorld;
 			//pCbData->ShadowViewProj = shadowVP;
@@ -373,7 +323,7 @@ void Fluid::UpdateFrame(float timeStep, uint8_t frameIndex,
 			const auto worldI = XMMatrixInverse(nullptr, world);
 			const auto worldViewProj = world * viewProj;
 
-			const auto pCbData = reinterpret_cast<CBPerObjectGrid3D*>(m_cbPerObject->Map(frameIndex));
+			const auto pCbData = reinterpret_cast<CBPerObject*>(m_cbPerObject->Map(frameIndex));
 			XMStoreFloat4x4(&pCbData->WorldViewProj, XMMatrixTranspose(worldViewProj));
 			XMStoreFloat4x4(&pCbData->WorldViewProjI, XMMatrixTranspose(XMMatrixInverse(nullptr, worldViewProj)));
 			XMStoreFloat3x4(&pCbData->WorldI, worldI);
@@ -427,7 +377,7 @@ void Fluid::Simulate(const CommandList* pCommandList, uint8_t frameIndex)
 		pCommandList->SetPipelineState(m_pipelines[ADVECT]);
 
 		// Set descriptor tables
-		pCommandList->SetComputeRootConstantBufferView(0, m_cbPerFrame.get(), m_cbPerFrame->GetCBVOffset(frameIndex));
+		pCommandList->SetComputeRootConstantBufferView(0, m_cbSimulation.get(), m_cbSimulation->GetCBVOffset(frameIndex));
 		pCommandList->SetComputeDescriptorTable(1, m_srvUavTables[SRV_UAV_TABLE_VECOLITY]);
 		pCommandList->SetComputeDescriptorTable(2, m_samplerTables[SAMPLER_TABLE_MIRROR]);
 		pCommandList->SetComputeDescriptorTable(3, m_srvUavTables[SRV_UAV_TABLE_COLOR + m_frameParity]);
@@ -449,7 +399,7 @@ void Fluid::Simulate(const CommandList* pCommandList, uint8_t frameIndex)
 		pCommandList->SetPipelineState(m_pipelines[PROJECT]);
 
 		// Set descriptor tables
-		pCommandList->SetComputeRootConstantBufferView(0, m_cbPerFrame.get(), m_cbPerFrame->GetCBVOffset(frameIndex));
+		pCommandList->SetComputeRootConstantBufferView(0, m_cbSimulation.get(), m_cbSimulation->GetCBVOffset(frameIndex));
 		pCommandList->SetComputeDescriptorTable(1, m_srvUavTables[SRV_UAV_TABLE_VECOLITY1]);
 		
 		XMUINT3 numGroups;
@@ -475,8 +425,7 @@ void Fluid::Render(const CommandList* pCommandList, uint8_t frameIndex, uint8_t 
 	const bool separateLightPass = flags & SEPARATE_LIGHT_PASS;
 	const bool cubemapRayMarch = flags & RAY_MARCH_CUBEMAP;
 
-	if (m_numParticles > 0) renderParticles(pCommandList, frameIndex);
-	else if (m_gridSize.z > 1)
+	if (m_gridSize.z > 1)
 	{
 		if (cubemapRayMarch)
 		{
@@ -532,22 +481,7 @@ bool Fluid::createPipelineLayouts()
 			PipelineLayoutFlag::NONE, L"ProjectionLayout"), false);
 	}
 
-	if (m_numParticles > 0)
-	{
-		// Particle rendering
-		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
-		pipelineLayout->SetRootCBV(0, 0, 0, Shader::Stage::VS);
-		pipelineLayout->SetRootCBV(1, 1);
-		pipelineLayout->SetRange(2, DescriptorType::UAV, 1, 0, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
-		pipelineLayout->SetRange(2, DescriptorType::SRV, 1, 0);
-		pipelineLayout->SetRange(3, DescriptorType::SRV, 1, 0);
-		pipelineLayout->SetRange(4, DescriptorType::SAMPLER, 1, 0);
-		pipelineLayout->SetShaderStage(2, Shader::Stage::VS);
-		pipelineLayout->SetShaderStage(3, Shader::Stage::DS);
-		X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
-			PipelineLayoutFlag::NONE, L"ParticleLayout"), false);
-	}
-	else if (m_gridSize.z > 1)
+	if (m_gridSize.z > 1)
 	{
 		// Ray marching
 		{
@@ -685,29 +619,7 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 	}
 
 	// Visualization
-	if (m_numParticles > 0)
-	{
-		// Particle rendering
-		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::VS, vsIndex, L"VSParticle.cso"), false);
-		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::HS, hsIndex, L"HSParticle.cso"), false);
-		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::DS, dsIndex, L"DSParticle.cso"), false);
-		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::PS, psIndex, L"PSParticle.cso"), false);
-
-		const auto state = Graphics::State::MakeUnique();
-		state->SetPipelineLayout(m_pipelineLayouts[VISUALIZE]);
-		state->SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, vsIndex++));
-		state->SetShader(Shader::Stage::HS, m_shaderPool->GetShader(Shader::Stage::HS, hsIndex++));
-		state->SetShader(Shader::Stage::DS, m_shaderPool->GetShader(Shader::Stage::DS, dsIndex++));
-		state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, psIndex++));
-		state->IASetPrimitiveTopologyType(PrimitiveTopologyType::PATCH);
-		state->DSSetState(Graphics::DEPTH_STENCIL_NONE, m_graphicsPipelineCache.get());
-		state->OMSetBlendState(Graphics::PREMULTIPLITED, m_graphicsPipelineCache.get());
-		state->OMSetNumRenderTargets(1);
-		state->OMSetRTVFormat(0, rtFormat);
-		//state->OMSetDSVFormat(dsFormat);
-		X_RETURN(m_pipelines[VISUALIZE], state->GetPipeline(m_graphicsPipelineCache.get(), L"Particle"), false);
-	}
-	else if (m_gridSize.z > 1)
+	if (m_gridSize.z > 1)
 	{
 		// Ray marching
 		{
@@ -810,16 +722,8 @@ bool Fluid::createPipelines(Format rtFormat, Format dsFormat)
 
 bool Fluid::createDescriptorTables()
 {
-	if (m_numParticles > 0)
-	{
-		// Create particle UAV
-		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
-		descriptorTable->SetDescriptors(0, 1, &m_particleBuffer->GetUAV());
-		X_RETURN(m_srvUavTables[UAV_SRV_TABLE_PARTICLE], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
-	}
-
 	// Create CBV tables
-	if (m_gridSize.z > 1 && m_numParticles <= 0)
+	if (m_gridSize.z > 1)
 	{
 		for (uint8_t i = 0; i < FrameCount; ++i)
 		{
@@ -827,7 +731,7 @@ bool Fluid::createDescriptorTables()
 			const Descriptor descriptors[] =
 			{
 				m_cbPerObject->GetCBV(i),
-				m_cbPerFrameGrid3D->GetCBV(i)
+				m_cbPerFrame->GetCBV(i)
 			};
 			descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
 			X_RETURN(m_cbvTables[i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
@@ -1100,27 +1004,4 @@ void Fluid::rayCastVDirect(const CommandList* pCommandList, uint8_t frameIndex)
 	pCommandList->SetGraphics32BitConstant(3, m_raySampleCount);
 
 	pCommandList->Draw(3, 1, 0, 0);
-}
-
-void Fluid::renderParticles(const CommandList* pCommandList, uint8_t frameIndex)
-{
-	// Set barrier
-	ResourceBarrier barrier;
-	const auto numBarriers = m_velocities[0]->SetBarrier(&barrier, ResourceState::NON_PIXEL_SHADER_RESOURCE);;
-	pCommandList->Barrier(numBarriers, &barrier);
-
-	// Set pipeline state
-	pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[VISUALIZE]);
-	pCommandList->SetPipelineState(m_pipelines[VISUALIZE]);
-
-	pCommandList->IASetPrimitiveTopology(PrimitiveTopology::CONTROL_POINT1_PATCHLIST);
-
-	// Set descriptor tables
-	pCommandList->SetGraphicsRootConstantBufferView(0, m_cbPerFrame.get(), m_cbPerFrame->GetCBVOffset(frameIndex));
-	pCommandList->SetGraphicsRootConstantBufferView(1, m_cbPerObject.get(), m_cbPerObject->GetCBVOffset(frameIndex));
-	pCommandList->SetGraphicsDescriptorTable(2, m_srvUavTables[UAV_SRV_TABLE_PARTICLE]);
-	pCommandList->SetGraphicsDescriptorTable(3, m_srvUavTables[SRV_UAV_TABLE_COLOR + !m_frameParity]);
-	pCommandList->SetGraphicsDescriptorTable(4, m_samplerTables[SAMPLER_TABLE_CLAMP]);
-
-	pCommandList->Draw(m_numParticles, 1, 0, 0);
 }

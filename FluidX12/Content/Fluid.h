@@ -24,7 +24,7 @@ public:
 	bool Init(XUSG::CommandList* pCommandList, uint32_t width, uint32_t height,
 		const XUSG::DescriptorTableCache::sptr& descriptorTableCache,
 		std::vector<XUSG::Resource::uptr>& uploaders, XUSG::Format rtFormat, XUSG::Format dsFormat,
-		const DirectX::XMUINT3& gridSize, uint32_t numParticles = 0);
+		const DirectX::XMUINT3& gridSize);
 
 	void SetMaxSamples(uint32_t maxRaySamples, uint32_t maxLightSamples);
 	void SetSH(const XUSG::StructuredBuffer::sptr& coeffSH);
@@ -61,7 +61,6 @@ protected:
 		SRV_TABLE_RAY_MARCH1,
 		UAV_TABLE_INCOMPRESS,
 		UAV_TABLE_LIGHT_MAP,
-		UAV_SRV_TABLE_PARTICLE,
 
 		NUM_SRV_UAV_TABLE
 	};
@@ -72,13 +71,6 @@ protected:
 		SAMPLER_TABLE_CLAMP,
 		
 		NUM_SAMPLER_TABLE
-	};
-
-	struct ParticleInfo
-	{
-		DirectX::XMFLOAT3 Pos;
-		DirectX::XMFLOAT3 Velocity;
-		float LifeTime;
 	};
 
 	bool createPipelineLayouts();
@@ -92,7 +84,6 @@ protected:
 	void renderCube(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	void rayCastDirect(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	void rayCastVDirect(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
-	void renderParticles(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 
 	XUSG::Device::sptr m_device;
 
@@ -116,11 +107,10 @@ protected:
 	XUSG::Texture3D::uptr	m_colors[2];
 	XUSG::Texture2D::uptr	m_cubeMap;
 	XUSG::Texture3D::uptr	m_lightMap;
-	XUSG::StructuredBuffer::uptr m_particleBuffer;
 
-	XUSG::ConstantBuffer::uptr m_cbPerFrame;
+	XUSG::ConstantBuffer::uptr m_cbSimulation;
 	XUSG::ConstantBuffer::uptr m_cbPerObject;
-	XUSG::ConstantBuffer::uptr m_cbPerFrameGrid3D;
+	XUSG::ConstantBuffer::uptr m_cbPerFrame;
 #if _CPU_CUBE_FACE_CULL_ == 2
 	XUSG::ConstantBuffer::uptr	m_cbCubeFaceList;
 #endif
@@ -136,7 +126,6 @@ protected:
 	DirectX::XMFLOAT3X4		m_volumeWorld;
 	DirectX::XMFLOAT3X4		m_lightMapWorld;
 
-	uint32_t				m_numParticles;
 	uint32_t				m_raySampleCount;
 	uint32_t				m_maxRaySamples;
 	uint32_t				m_maxLightSamples;

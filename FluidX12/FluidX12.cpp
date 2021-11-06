@@ -39,7 +39,6 @@ FluidX::FluidX(uint32_t width, uint32_t height, std::wstring name) :
 	m_isPaused(false),
 	m_tracking(false),
 	m_gridSize(128, 128, 128),
-	m_numParticles(0),
 	m_radianceFile(L"")
 {
 #if defined (_DEBUG)
@@ -164,7 +163,7 @@ void FluidX::LoadAssets()
 	m_fluid = make_unique<Fluid>(m_device);
 	if (!m_fluid) ThrowIfFailed(E_FAIL);
 	if (!m_fluid->Init(pCommandList, m_width, m_height, m_descriptorTableCache, uploaders,
-		Format::B8G8R8A8_UNORM, Format::D24_UNORM_S8_UINT, m_gridSize, m_numParticles))
+		Format::B8G8R8A8_UNORM, Format::D24_UNORM_S8_UINT, m_gridSize))
 		ThrowIfFailed(E_FAIL);
 	m_fluid->SetMaxSamples(m_maxRaySamples, m_maxLightSamples);
 
@@ -344,11 +343,6 @@ void FluidX::ParseCommandLineArgs(wchar_t* argv[], int argc)
 			m_gridSize.x = ++i < argc ? static_cast<uint32_t>(_wtof(argv[i])) : m_gridSize.x;
 			m_gridSize.y = ++i < argc ? static_cast<uint32_t>(_wtof(argv[i])) : m_gridSize.y;
 			m_gridSize.z = ++i < argc ? static_cast<uint32_t>(_wtof(argv[i])) : m_gridSize.z;
-		}
-		else if (_wcsnicmp(argv[i], L"-particles", wcslen(argv[i])) == 0 ||
-			_wcsnicmp(argv[i], L"/particles", wcslen(argv[i])) == 0)
-		{
-			m_numParticles = ++i < argc ? static_cast<uint32_t>(_wtof(argv[i])) : m_numParticles;
 		}
 		else if (_wcsnicmp(argv[i], L"-maxRaySamples", wcslen(argv[i])) == 0 ||
 			_wcsnicmp(argv[i], L"/maxRaySamples", wcslen(argv[i])) == 0)
