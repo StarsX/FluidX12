@@ -13,6 +13,7 @@
 
 #include "StepTimer.h"
 #include "Fluid.h"
+#include "LightProbe.h"
 
 using namespace DirectX;
 
@@ -56,6 +57,7 @@ private:
 	XUSG::CommandList::uptr		m_commandList;
 
 	// App resources.
+	std::unique_ptr<LightProbe>	m_lightProbe;
 	std::unique_ptr<Fluid>		m_fluid;
 	XUSG::DepthStencil::uptr	m_depth;
 	XMFLOAT4X4	m_proj;
@@ -83,6 +85,8 @@ private:
 	// User external settings
 	XMUINT3 m_gridSize;
 	uint32_t m_numParticles;
+
+	std::wstring m_radianceFile;
 
 	void LoadPipeline();
 	void LoadAssets();

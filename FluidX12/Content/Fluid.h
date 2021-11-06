@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------------------
-// Copyright (c) XU, Tianchen. All rights reserved.
+// Copyright (c) XU, Tianchen & ZENG, Wei. All rights reserved.
 //--------------------------------------------------------------------------------------
 
 #pragma once
@@ -13,7 +13,9 @@ public:
 	enum RenderFlags : uint8_t
 	{
 		RAY_MARCH_DIRECT = 0,
-		SEPARATE_LIGHT_PASS = (1 << 0)
+		RAY_MARCH_CUBEMAP = (1 << 0),
+		SEPARATE_LIGHT_PASS = (1 << 1),
+		OPTIMIZED = RAY_MARCH_CUBEMAP | SEPARATE_LIGHT_PASS
 	};
 
 	Fluid(const XUSG::Device::sptr& device);
@@ -25,6 +27,7 @@ public:
 		const DirectX::XMUINT3& gridSize, uint32_t numParticles = 0);
 
 	void SetMaxSamples(uint32_t maxRaySamples, uint32_t maxLightSamples);
+	void SetSH(const XUSG::StructuredBuffer::sptr& coeffSH);
 	void UpdateFrame(float timeStep, uint8_t frameIndex, const DirectX::XMFLOAT4X4& view,
 		const DirectX::XMFLOAT4X4& proj, const DirectX::XMFLOAT3& eyePt);
 	void Simulate(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
@@ -37,11 +40,15 @@ protected:
 	{
 		ADVECT,
 		PROJECT,
-		VISUALIZE,
+		RAY_MARCH,
 		RAY_MARCH_L,
 		RAY_MARCH_V,
+		RENDER_CUBE,
+		DIRECT_RAY_CAST,
+		DIRECT_RAY_CAST_V,
 
-		NUM_PIPELINE
+		NUM_PIPELINE,
+		VISUALIZE = RAY_MARCH
 	};
 
 	enum SrvUavTable : uint8_t
@@ -79,9 +86,12 @@ protected:
 	bool createDescriptorTables();
 
 	void visualizeColor(const XUSG::CommandList* pCommandList);
-	void rayCast(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void rayMarch(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	void rayMarchL(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	void rayMarchV(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void renderCube(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void rayCastDirect(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void rayCastVDirect(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	void renderParticles(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 
 	XUSG::Device::sptr m_device;
@@ -95,6 +105,8 @@ protected:
 	XUSG::PipelineLayout	m_pipelineLayouts[NUM_PIPELINE];
 	XUSG::Pipeline			m_pipelines[NUM_PIPELINE];
 
+	std::vector<XUSG::DescriptorTable> m_uavMipTables;
+	std::vector<XUSG::DescriptorTable> m_srvMipTables;
 	XUSG::DescriptorTable	m_srvUavTables[NUM_SRV_UAV_TABLE];
 	XUSG::DescriptorTable	m_samplerTables[NUM_SAMPLER_TABLE];
 	XUSG::DescriptorTable	m_cbvTables[FrameCount];
@@ -102,12 +114,18 @@ protected:
 	XUSG::Texture3D::uptr	m_incompress;
 	XUSG::Texture3D::uptr	m_velocities[2];
 	XUSG::Texture3D::uptr	m_colors[2];
+	XUSG::Texture2D::uptr	m_cubeMap;
 	XUSG::Texture3D::uptr	m_lightMap;
 	XUSG::StructuredBuffer::uptr m_particleBuffer;
 
 	XUSG::ConstantBuffer::uptr m_cbPerFrame;
-	XUSG::ConstantBuffer::uptr m_cbPerFrameGrid3D;
 	XUSG::ConstantBuffer::uptr m_cbPerObject;
+	XUSG::ConstantBuffer::uptr m_cbPerFrameGrid3D;
+#if _CPU_CUBE_FACE_CULL_ == 2
+	XUSG::ConstantBuffer::uptr	m_cbCubeFaceList;
+#endif
+
+	XUSG::StructuredBuffer::sptr m_coeffSH;
 
 	DirectX::XMFLOAT3		m_lightPt;
 	DirectX::XMFLOAT4		m_lightColor;
@@ -118,9 +136,15 @@ protected:
 	DirectX::XMFLOAT3X4		m_volumeWorld;
 	DirectX::XMFLOAT3X4		m_lightMapWorld;
 
+	uint32_t				m_numParticles;
+	uint32_t				m_raySampleCount;
 	uint32_t				m_maxRaySamples;
 	uint32_t				m_maxLightSamples;
-	uint32_t				m_numParticles;
+#if _CPU_CUBE_FACE_CULL_ == 1
+	uint32_t				m_visibilityMask;
+#endif
+	uint8_t					m_cubeFaceCount;
+	uint8_t					m_cubeMapLOD;
 	uint8_t					m_frameParity;
 
 	float					m_timeStep;

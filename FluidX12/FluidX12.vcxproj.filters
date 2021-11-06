@@ -28,9 +28,6 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{c6cbf730-3a04-4e8f-9fa2-94d7d2145f9b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="XUSG\Core">
-      <UniqueIdentifier>{93b2fd6a-d8de-4bdf-8acb-1cb7bf5288de}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Shaders\Simulation">
       <UniqueIdentifier>{714fc0ee-cb60-45fa-b4d4-0dd1b1e9c86d}</UniqueIdentifier>
     </Filter>
@@ -39,6 +36,9 @@
     </Filter>
     <Filter Include="Shaders\Rendering">
       <UniqueIdentifier>{d5948538-5a6c-4355-be97-873963b1f36a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Rendering\SHMath">
+      <UniqueIdentifier>{48436bf4-1f06-42d1-8a0a-e5ebb2a18402}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -72,11 +72,20 @@
     <ClInclude Include="FluidX12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="XUSG\Core\XUSG.h">
-      <Filter>XUSG\Core</Filter>
-    </ClInclude>
     <ClInclude Include="Common\d3d12.h">
       <Filter>Common\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Content\LightProbe.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="XUSG\Core\XUSG.h">
+      <Filter>XUSG</Filter>
+    </ClInclude>
+    <ClInclude Include="Content\SharedConsts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="XUSG\Advanced\XUSGDDSLoader.h">
+      <Filter>XUSG</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -98,6 +107,9 @@
     <ClCompile Include="FluidX12.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Content\LightProbe.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Content\Shaders\CSPoisson.hlsli">
@@ -114,6 +126,18 @@
     </None>
     <None Include="Content\Shaders\Simulation.hlsli">
       <Filter>Shaders\Simulation</Filter>
+    </None>
+    <None Include="Content\Shaders\SHIrradiance.hlsli">
+      <Filter>Shaders\Rendering\SHMath</Filter>
+    </None>
+    <None Include="Content\Shaders\SHMath.hlsli">
+      <Filter>Shaders\Rendering\SHMath</Filter>
+    </None>
+    <None Include="Content\Shaders\CubeMap.hlsli">
+      <Filter>Shaders\Rendering</Filter>
+    </None>
+    <None Include="Content\Shaders\PSCube.hlsli">
+      <Filter>Shaders\Rendering</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -151,6 +175,33 @@
       <Filter>Shaders\Rendering</Filter>
     </FxCompile>
     <FxCompile Include="Content\Shaders\CSRayMarchL.hlsl">
+      <Filter>Shaders\Rendering</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\CSSHCubeMap.hlsl">
+      <Filter>Shaders\Rendering\SHMath</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\CSSHNormalize.hlsl">
+      <Filter>Shaders\Rendering\SHMath</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\CSSHSum.hlsl">
+      <Filter>Shaders\Rendering\SHMath</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\CSRayMarch.hlsl">
+      <Filter>Shaders\Rendering</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\CSRayMarchV.hlsl">
+      <Filter>Shaders\Rendering</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\PSEnvironment.hlsl">
+      <Filter>Shaders\Rendering</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\PSRayCastCube.hlsl">
+      <Filter>Shaders\Rendering</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\VSCube.hlsl">
+      <Filter>Shaders\Rendering</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\PSCube.hlsl">
       <Filter>Shaders\Rendering</Filter>
     </FxCompile>
   </ItemGroup>

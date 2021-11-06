@@ -34,7 +34,7 @@ cbuffer cbPerObject : register (b1)
 {
 	float4x3 g_worldView;
 	float4x3 g_worldViewI;
-	matrix g_proj;
+	float4x4 g_proj;
 };
 
 static const float g_particleRadius = 0.4;

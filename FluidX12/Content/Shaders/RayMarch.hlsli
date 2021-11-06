@@ -1,8 +1,11 @@
 //--------------------------------------------------------------------------------------
-// Copyright (c) XU, Tianchen. All rights reserved.
+// Copyright (c) XU, Tianchen & ZENG, Wei. All rights reserved.
 //--------------------------------------------------------------------------------------
 
 #include "RayCast.hlsli"
+#ifdef _HAS_LIGHT_PROBE_
+#include "SHIrradiance.hlsli"
+#endif
 
 #define ABSORPTION			1.0
 #define ZERO_THRESHOLD		0.01
@@ -45,7 +48,7 @@ Texture2D<float> g_txShadow;
 #endif
 
 #if defined(_HAS_LIGHT_PROBE_) && !defined(_LIGHT_PASS_)
-TextureCube<float3> g_txIrradiance;
+StructuredBuffer<float3> g_roSHCoeffs;
 #endif
 
 //--------------------------------------------------------------------------------------
@@ -145,7 +148,7 @@ min16float ShadowTest(float3 pos, Texture2D<float> txDepth)
 #if defined(_HAS_LIGHT_PROBE_) && !defined(_LIGHT_PASS_)
 float3 GetIrradiance(float3 dir)
 {
-	return g_txIrradiance.SampleLevel(g_smpLinear, dir, 0.0);
+	return EvaluateSHIrradiance(g_roSHCoeffs, normalize(dir));
 }
 #endif
 
