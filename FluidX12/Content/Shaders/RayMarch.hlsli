@@ -200,7 +200,7 @@ float3 LocalToTex3DSpace(float3 pos)
 // Get light
 //--------------------------------------------------------------------------------------
 #ifdef _LIGHT_PASS_
-float3 GetLight(float3 pos, float3 step)
+float3 GetLight(float3 pos, float3 rayDir)
 {
 	pos = mul(float4(pos, 1.0), g_localToLight);
 	const float3 uvw = pos * 0.5 + 0.5;
@@ -208,7 +208,7 @@ float3 GetLight(float3 pos, float3 step)
 	return g_txLightMap.SampleLevel(g_smpLinear, uvw, 0.0);
 }
 #else
-float3 GetLight(float3 pos, float3 step)
+float3 GetLight(float3 pos, float3 lightDir)
 {
 	// Transmittance along light ray
 #if defined(_HAS_SHADOW_MAP_) && !defined(_LIGHT_PASS_)
@@ -219,11 +219,12 @@ float3 GetLight(float3 pos, float3 step)
 
 	if (shadow > ZERO_THRESHOLD)
 	{
-		float3 rayPos = pos;
+		float t = g_lightStepScale;
+		min16float step = g_lightStepScale;
 		for (uint i = 0; i < g_numLightSamples; ++i)
 		{
 			// Update position along light ray
-			rayPos += step;
+			const float3 rayPos = pos + lightDir * t;
 			if (any(abs(rayPos) > 1.0)) break;
 			const float3 uvw = LocalToTex3DSpace(rayPos);
 
@@ -231,8 +232,14 @@ float3 GetLight(float3 pos, float3 step)
 			const min16float density = GetSample(uvw).w;
 
 			// Attenuate ray-throughput along light direction
-			shadow *= 1.0 - GetOpacity(density, g_lightStepScale);
+			const min16float opacity = GetOpacity(density, step);
+			shadow *= 1.0 - opacity;
 			if (shadow < ZERO_THRESHOLD) break;
+
+			// Update position along light ray
+			step = min16float(max((1.0 - shadow) * 2.0, 0.8)) * g_lightStepScale;
+			step *= clamp(1.0 - opacity * 4.0, 0.5, 2.0);
+			t += step;
 		}
 	}
 
@@ -244,13 +251,14 @@ float3 GetLight(float3 pos, float3 step)
 		const float3 uvw = LocalToTex3DSpace(pos);
 		const float3 rayVec = -GetDensityGradient(uvw);
 		irradiance = GetIrradiance(mul(rayVec, (float3x3)g_world));
-		const float3 step = normalize(rayVec) * g_lightStepScale;
+		const float3 rayDir = normalize(rayVec);
 
-		float3 rayPos = pos;
+		float t = g_lightStepScale;
+		min16float step = g_lightStepScale;
 		for (uint i = 0; i < g_numSamples; ++i)
 		{
 			// Update position along light ray
-			rayPos += step;
+			const float3 rayPos = pos + rayDir * t;
 			if (any(abs(rayPos) > 1.0)) break;
 			const float3 uvw = LocalToTex3DSpace(rayPos);
 
@@ -258,8 +266,14 @@ float3 GetLight(float3 pos, float3 step)
 			const min16float density = GetSample(uvw).w;
 
 			// Attenuate ray-throughput along light direction
-			ao *= 1.0 - GetOpacity(density, g_lightStepScale);
+			const min16float opacity = GetOpacity(density, step);
+			ao *= 1.0 - opacity;
 			if (ao < ZERO_THRESHOLD) break;
+
+			// Update position along light ray
+			step = min16float(max((1.0 - shadow) * 2.0, 0.8)) * g_lightStepScale;
+			step *= clamp(1.0 - opacity * 4.0, 0.5, 2.0);
+			t += step;
 		}
 	}
 #endif
