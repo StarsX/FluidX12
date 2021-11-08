@@ -4,6 +4,7 @@
 
 #include "RayCast.hlsli"
 #ifdef _HAS_LIGHT_PROBE_
+#define SH_ORDER 3
 #include "SHIrradiance.hlsli"
 #endif
 
@@ -146,9 +147,9 @@ min16float ShadowTest(float3 pos, Texture2D<float> txDepth)
 // Get irradiance
 //--------------------------------------------------------------------------------------
 #if defined(_HAS_LIGHT_PROBE_) && !defined(_LIGHT_PASS_)
-float3 GetIrradiance(float3 dir)
+float3 GetIrradiance(float3 shCoeffs[SH_NUM_COEFF], float3 dir)
 {
-	return EvaluateSHIrradiance(g_roSHCoeffs, normalize(dir));
+	return EvaluateSHIrradiance(shCoeffs, normalize(dir));
 }
 #endif
 
@@ -200,7 +201,7 @@ float3 LocalToTex3DSpace(float3 pos)
 // Get light
 //--------------------------------------------------------------------------------------
 #ifdef _LIGHT_PASS_
-float3 GetLight(float3 pos, float3 rayDir)
+float3 GetLight(float3 pos, float3 rayDir, float3 shCoeffs[SH_NUM_COEFF])
 {
 	pos = mul(float4(pos, 1.0), g_localToLight);
 	const float3 uvw = pos * 0.5 + 0.5;
@@ -208,7 +209,7 @@ float3 GetLight(float3 pos, float3 rayDir)
 	return g_txLightMap.SampleLevel(g_smpLinear, uvw, 0.0);
 }
 #else
-float3 GetLight(float3 pos, float3 lightDir)
+float3 GetLight(float3 pos, float3 lightDir, float3 shCoeffs[SH_NUM_COEFF])
 {
 	// Transmittance along light ray
 #if defined(_HAS_SHADOW_MAP_) && !defined(_LIGHT_PASS_)
@@ -250,7 +251,7 @@ float3 GetLight(float3 pos, float3 lightDir)
 	{
 		const float3 uvw = LocalToTex3DSpace(pos);
 		const float3 rayVec = -GetDensityGradient(uvw);
-		irradiance = GetIrradiance(mul(rayVec, (float3x3)g_world));
+		irradiance = GetIrradiance(shCoeffs, mul(rayVec, (float3x3)g_world));
 		const float3 rayDir = normalize(rayVec);
 
 		float t = g_lightStepScale;
