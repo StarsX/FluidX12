@@ -59,7 +59,7 @@ min16float4 main(PSIn input) : SV_TARGET
 	const float3 localSpaceLightPt = mul(float4(g_lightPt, 1.0), g_worldI);
 #else
 	const float3 localSpaceLightPt = mul(g_lightPt, (float3x3)g_worldI);
-	const float3 lightStep = normalize(localSpaceLightPt) * g_lightStepScale;
+	const float3 lightDir = normalize(localSpaceLightPt);
 #endif
 
 	// Transmittance
@@ -69,8 +69,7 @@ min16float4 main(PSIn input) : SV_TARGET
 	min16float3 scatter = 0.0;
 
 	float t = 0.0;
-	min16float opacity = 0.0;
-	min16float stepScale = g_stepScale;
+	min16float step = g_stepScale;
 	for (uint i = 0; i < g_numSamples; ++i)
 	{
 		const float3 pos = rayOrigin + rayDir * t;
@@ -85,16 +84,16 @@ min16float4 main(PSIn input) : SV_TARGET
 		{
 #ifdef _POINT_LIGHT_
 			// Point light direction in texture space
-			const float3 lightStep = normalize(g_localSpaceLightPt - pos) * g_lightStepScale;
+			const float3 lightDir = normalize(g_localSpaceLightPt - pos);
 #endif
 			// Sample light
-			const float3 light = GetLight(pos, lightStep);
+			const float3 light = GetLight(pos, lightDir);
 			
 			// Accumulate color
-			color.w = GetOpacity(color.w, stepScale);
+			color.w = GetOpacity(color.w, step);
 			color.xyz *= transm;
 #ifdef _PRE_MULTIPLIED_
-			color.xyz = GetPremultiplied(color.xyz, stepScale);
+			color.xyz = GetPremultiplied(color.xyz, step);
 #else
 			color.xyz *= color.w;
 #endif
@@ -107,9 +106,9 @@ min16float4 main(PSIn input) : SV_TARGET
 			if (transm < ZERO_THRESHOLD) break;
 		}
 
-		stepScale = min16float(max(1.5 * g_stepScale * t, g_stepScale));
-		stepScale *= clamp(1.0 - (color.w - opacity) * 8.0, 1e-5, 2.0);
-		t += stepScale;
+		step = min16float(max((1.0 - transm) * 2.0, 0.8)) * g_stepScale;
+		step *= clamp(1.0 - color.w * 4.0, 0.5, 2.0);
+		t += step;
 #ifdef _HAS_DEPTH_MAP_
 		if (t > tMax) break;
 #endif

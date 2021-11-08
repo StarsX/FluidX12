@@ -53,6 +53,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 #endif
 
 			float t = g_stepScale;
+			min16float step = g_stepScale;
 			for (uint i = 0; i < g_numSamples; ++i)
 			{
 				const float3 pos = rayOrigin.xyz + rayDir * t;
@@ -63,11 +64,14 @@ void main(uint3 DTid : SV_DispatchThreadID)
 				const min16float density = GetSample(uvw).w;
 
 				// Attenuate ray-throughput along light direction
-				shadow *= 1.0 - GetOpacity(density, g_stepScale);
+				const min16float opacity = GetOpacity(density, step);
+				shadow *= 1.0 - opacity;
 				if (shadow < ZERO_THRESHOLD) break;
 
 				// Update position along light ray
-				t += g_stepScale;
+				step = min16float(max((1.0 - shadow) * 2.0, 0.8)) * g_stepScale;
+				step *= clamp(1.0 - opacity * 4.0, 0.5, 2.0);
+				t += step;
 			}
 		}
 
@@ -79,6 +83,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 			rayDir = normalize(rayDir);
 
 			float t = g_stepScale;
+			min16float step = g_stepScale;
 			for (uint i = 0; i < g_numSamples; ++i)
 			{
 				const float3 pos = rayOrigin.xyz + rayDir * t;
@@ -89,11 +94,14 @@ void main(uint3 DTid : SV_DispatchThreadID)
 				const min16float density = GetSample(uvw).w;
 
 				// Attenuate ray-throughput along light direction
-				ao *= 1.0 - GetOpacity(density, g_stepScale);
+				const min16float opacity = GetOpacity(density, step);
+				ao *= 1.0 - opacity;
 				if (ao < ZERO_THRESHOLD) break;
 
 				// Update position along light ray
-				t += g_stepScale;
+				step = min16float(max((1.0 - shadow) * 2.0, 0.8)) * g_stepScale;
+				step *= clamp(1.0 - opacity * 4.0, 0.5, 2.0);
+				t += step;
 			}
 		}
 #endif
