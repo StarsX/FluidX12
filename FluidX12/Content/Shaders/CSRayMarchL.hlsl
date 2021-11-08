@@ -78,8 +78,10 @@ void main(uint3 DTid : SV_DispatchThreadID)
 #ifdef _HAS_LIGHT_PROBE_
 		if (g_hasLightProbes)
 		{
+			float3 shCoeffs[SH_NUM_COEFF];
+			LoadSH(shCoeffs, g_roSHCoeffs);
 			float3 rayDir = -GetDensityGradient(uvw);
-			irradiance = GetIrradiance(mul(rayDir, (float3x3)g_world));
+			irradiance = GetIrradiance(shCoeffs, mul(rayDir, (float3x3)g_world));
 			rayDir = normalize(rayDir);
 
 			float t = g_stepScale;

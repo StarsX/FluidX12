@@ -121,6 +121,11 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	g_rwCubeDepth[DTid] = pos.z;
 	const float tMax = GetTMax(pos, rayOrigin, rayDir);
 #endif
+
+	float3 shCoeffs[SH_NUM_COEFF];
+#if defined(_HAS_LIGHT_PROBE_) && !defined(_LIGHT_PASS_)
+	if (g_hasLightProbes) LoadSH(shCoeffs, g_roSHCoeffs);
+#endif
 	
 #ifdef _POINT_LIGHT_
 	const float3 localSpaceLightPt = mul(float4(g_lightPt, 1.0), g_worldI);
@@ -155,7 +160,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 #endif
 
 			// Sample light
-			const float3 light = GetLight(pos, lightDir);
+			const float3 light = GetLight(pos, lightDir, shCoeffs);
 
 			// Accumulate color
 			color.w = GetOpacity(color.w, step);
