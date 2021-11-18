@@ -247,12 +247,13 @@ float3 GetLight(float3 pos, float3 lightDir, float3 shCoeffs[SH_NUM_COEFF])
 #ifdef _HAS_LIGHT_PROBE_
 	min16float ao = 1.0;
 	float3 irradiance = 0.0;
-	if (g_hasLightProbes)
+	if (g_hasLightProbes) // An approximation to GI effect with light probe
 	{
 		const float3 uvw = LocalToTex3DSpace(pos);
-		const float3 rayVec = -GetDensityGradient(uvw);
-		irradiance = GetIrradiance(shCoeffs, mul(rayVec, (float3x3)g_world));
-		const float3 rayDir = normalize(rayVec);
+		float3 rayDir = -GetDensityGradient(uvw);
+		rayDir = any(abs(rayDir) > 0.0) ? rayDir : pos; // Avoid 0-gradient caused by uniform density field 
+		irradiance = GetIrradiance(shCoeffs, mul(rayDir, (float3x3)g_world));
+		rayDir = normalize(rayDir);
 
 		float t = g_lightStepScale;
 		min16float step = g_lightStepScale;
@@ -272,7 +273,7 @@ float3 GetLight(float3 pos, float3 lightDir, float3 shCoeffs[SH_NUM_COEFF])
 			if (ao < ZERO_THRESHOLD) break;
 
 			// Update position along light ray
-			step = min16float(max((1.0 - shadow) * 2.0, 0.8)) * g_lightStepScale;
+			step = min16float(max((1.0 - ao) * 2.0, 0.8)) * g_lightStepScale;
 			step *= clamp(1.0 - opacity * 4.0, 0.5, 2.0);
 			t += step;
 		}

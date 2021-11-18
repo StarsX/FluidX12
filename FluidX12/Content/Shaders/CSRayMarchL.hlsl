@@ -76,11 +76,12 @@ void main(uint3 DTid : SV_DispatchThreadID)
 		}
 
 #ifdef _HAS_LIGHT_PROBE_
-		if (g_hasLightProbes)
+		if (g_hasLightProbes) // An approximation to GI effect with light probe
 		{
 			float3 shCoeffs[SH_NUM_COEFF];
 			LoadSH(shCoeffs, g_roSHCoeffs);
 			float3 rayDir = -GetDensityGradient(uvw);
+			rayDir = any(abs(rayDir) > 0.0) ? rayDir : rayOrigin.xyz; // Avoid 0-gradient caused by uniform density field
 			irradiance = GetIrradiance(shCoeffs, mul(rayDir, (float3x3)g_world));
 			rayDir = normalize(rayDir);
 
@@ -101,7 +102,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 				if (ao < ZERO_THRESHOLD) break;
 
 				// Update position along light ray
-				step = min16float(max((1.0 - shadow) * 2.0, 0.8)) * g_stepScale;
+				step = min16float(max((1.0 - ao) * 2.0, 0.8)) * g_stepScale;
 				step *= clamp(1.0 - opacity * 4.0, 0.5, 2.0);
 				t += step;
 			}
