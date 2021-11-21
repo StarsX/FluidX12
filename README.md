@@ -8,8 +8,8 @@ Hot keys:
 
 [F1] show/hide FPS
 
-[←][→] toggle rendering method  
+[←][→] toggle ray-marching methods
 
 [Space] pause/play animation
 
-Prerequisite: https://github.com/StarsX/XUSGCore
+Prerequisite: https://github.com/StarsX/XUSG
