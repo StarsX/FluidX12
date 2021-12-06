@@ -30,8 +30,8 @@ public:
 	void SetSH(const XUSG::StructuredBuffer::sptr& coeffSH);
 	void UpdateFrame(float timeStep, uint8_t frameIndex, const DirectX::XMFLOAT4X4& view,
 		const DirectX::XMFLOAT4X4& proj, const DirectX::XMFLOAT3& eyePt);
-	void Simulate(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
-	void Render(const XUSG::CommandList* pCommandList, uint8_t frameIndex, uint8_t flags);
+	void Simulate(XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void Render(XUSG::CommandList* pCommandList, uint8_t frameIndex, uint8_t flags);
 
 	static const uint8_t FrameCount = 3;
 
@@ -78,12 +78,12 @@ protected:
 	bool createDescriptorTables();
 
 	void visualizeColor(const XUSG::CommandList* pCommandList);
-	void rayMarch(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void rayMarch(XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	void rayMarchL(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
-	void rayMarchV(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
-	void renderCube(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void rayMarchV(XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void renderCube(XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	void rayCastDirect(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
-	void rayCastVDirect(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void rayCastVDirect(XUSG::CommandList* pCommandList, uint8_t frameIndex);
 
 	XUSG::Device::sptr m_device;
 

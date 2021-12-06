@@ -98,7 +98,7 @@ void LightProbe::UpdateFrame(uint8_t frameIndex, CXMMATRIX viewProj, const XMFLO
 	XMStoreFloat4x4(&pCbData->ScreenToWorld, XMMatrixTranspose(projToWorld));
 }
 
-void LightProbe::Process(const CommandList* pCommandList, uint8_t frameIndex)
+void LightProbe::Process(CommandList* pCommandList, uint8_t frameIndex)
 {
 	// Set Descriptor pools
 	const DescriptorPool descriptorPools[] =
@@ -263,7 +263,7 @@ bool LightProbe::createDescriptorTables()
 	return true;
 }
 
-void LightProbe::shCubeMap(const CommandList* pCommandList, uint8_t order)
+void LightProbe::shCubeMap(CommandList* pCommandList, uint8_t order)
 {
 	assert(order <= SH_MAX_ORDER);
 	ResourceBarrier barrier;
@@ -282,7 +282,7 @@ void LightProbe::shCubeMap(const CommandList* pCommandList, uint8_t order)
 	pCommandList->Dispatch(DIV_UP(m_numSHTexels, SH_GROUP_SIZE), 1, 1);
 }
 
-void LightProbe::shSum(const CommandList* pCommandList, uint8_t order)
+void LightProbe::shSum(CommandList* pCommandList, uint8_t order)
 {
 	assert(order <= SH_MAX_ORDER);
 	ResourceBarrier barriers[4];
@@ -317,7 +317,7 @@ void LightProbe::shSum(const CommandList* pCommandList, uint8_t order)
 	}
 }
 
-void LightProbe::shNormalize(const CommandList* pCommandList, uint8_t order)
+void LightProbe::shNormalize(CommandList* pCommandList, uint8_t order)
 {
 	assert(order <= SH_MAX_ORDER);
 	ResourceBarrier barriers[3];

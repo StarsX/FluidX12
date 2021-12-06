@@ -18,7 +18,7 @@ public:
 	bool CreateDescriptorTables();
 
 	void UpdateFrame(uint8_t frameIndex, DirectX::CXMMATRIX viewProj, const DirectX::XMFLOAT3& eyePt);
-	void Process(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void Process(XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	void RenderEnvironment(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 
 	XUSG::ShaderResource* GetRadiance() const;
@@ -42,9 +42,9 @@ protected:
 	bool createPipelines(XUSG::Format rtFormat, XUSG::Format dsFormat);
 	bool createDescriptorTables();
 
-	void shCubeMap(const XUSG::CommandList* pCommandList, uint8_t order);
-	void shSum(const XUSG::CommandList* pCommandList, uint8_t order);
-	void shNormalize(const XUSG::CommandList* pCommandList, uint8_t order);
+	void shCubeMap(XUSG::CommandList* pCommandList, uint8_t order);
+	void shSum(XUSG::CommandList* pCommandList, uint8_t order);
+	void shNormalize(XUSG::CommandList* pCommandList, uint8_t order);
 	
 	XUSG::Device::sptr m_device;
 

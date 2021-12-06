@@ -355,7 +355,7 @@ void Fluid::UpdateFrame(float timeStep, uint8_t frameIndex,
 	if (timeStep > 0.0) m_frameParity = !m_frameParity;
 }
 
-void Fluid::Simulate(const CommandList* pCommandList, uint8_t frameIndex)
+void Fluid::Simulate(CommandList* pCommandList, uint8_t frameIndex)
 {
 	ResourceBarrier barriers[3];
 
@@ -420,7 +420,7 @@ void Fluid::Simulate(const CommandList* pCommandList, uint8_t frameIndex)
 	}
 }
 
-void Fluid::Render(const CommandList* pCommandList, uint8_t frameIndex, uint8_t flags)
+void Fluid::Render(CommandList* pCommandList, uint8_t frameIndex, uint8_t flags)
 {
 	const bool separateLightPass = flags & SEPARATE_LIGHT_PASS;
 	const bool cubemapRayMarch = flags & RAY_MARCH_CUBEMAP;
@@ -850,7 +850,7 @@ void Fluid::visualizeColor(const CommandList* pCommandList)
 	pCommandList->Draw(3, 1, 0, 0);
 }
 
-void Fluid::rayMarch(const CommandList* pCommandList, uint8_t frameIndex)
+void Fluid::rayMarch(CommandList* pCommandList, uint8_t frameIndex)
 {
 	// Set barriers
 	ResourceBarrier barriers[6];
@@ -907,7 +907,7 @@ void Fluid::rayMarchL(const CommandList* pCommandList, uint8_t frameIndex)
 	pCommandList->Dispatch(DIV_UP(m_lightMapSize.x, 4), DIV_UP(m_lightMapSize.y, 4), DIV_UP(m_lightMapSize.z, 4));
 }
 
-void Fluid::rayMarchV(const CommandList* pCommandList, uint8_t frameIndex)
+void Fluid::rayMarchV(CommandList* pCommandList, uint8_t frameIndex)
 {
 	// Set barriers
 	ResourceBarrier barriers[7];
@@ -938,7 +938,7 @@ void Fluid::rayMarchV(const CommandList* pCommandList, uint8_t frameIndex)
 	pCommandList->Dispatch(DIV_UP(gridSize, 8), DIV_UP(gridSize, 8), m_cubeFaceCount);
 }
 
-void Fluid::renderCube(const CommandList* pCommandList, uint8_t frameIndex)
+void Fluid::renderCube(CommandList* pCommandList, uint8_t frameIndex)
 {
 	// Set barriers
 	ResourceBarrier barriers[6];
@@ -983,7 +983,7 @@ void Fluid::rayCastDirect(const CommandList* pCommandList, uint8_t frameIndex)
 	pCommandList->Draw(3, 1, 0, 0);
 }
 
-void Fluid::rayCastVDirect(const CommandList* pCommandList, uint8_t frameIndex)
+void Fluid::rayCastVDirect(CommandList* pCommandList, uint8_t frameIndex)
 {
 	// Set barriers
 	ResourceBarrier barriers;
