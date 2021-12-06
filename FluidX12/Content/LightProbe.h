@@ -60,7 +60,7 @@ protected:
 	XUSG::DescriptorTable	m_srvTable;
 	XUSG::DescriptorTable	m_samplerTable;
 
-	XUSG::ShaderResource::sptr	m_radiance;
+	XUSG::Texture::sptr	m_radiance;
 
 	XUSG::StructuredBuffer::sptr m_coeffSH[2];
 	XUSG::StructuredBuffer::uptr m_weightSH[2];
