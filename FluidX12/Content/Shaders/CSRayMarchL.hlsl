@@ -69,8 +69,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 				if (shadow < ZERO_THRESHOLD) break;
 
 				// Update position along light ray
-				step = min16float(max((1.0 - shadow) * 2.0, 0.8)) * g_stepScale;
-				step *= clamp(1.0 - opacity * 4.0, 0.5, 2.0);
+				step = GetStep(shadow, opacity, g_stepScale);
 				t += step;
 			}
 		}
@@ -102,8 +101,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 				if (ao < ZERO_THRESHOLD) break;
 
 				// Update position along light ray
-				step = min16float(max((1.0 - ao) * 2.0, 0.8)) * g_stepScale;
-				step *= clamp(1.0 - opacity * 4.0, 0.5, 2.0);
+				step = GetStep(ao, opacity, g_stepScale);
 				t += step;
 			}
 		}

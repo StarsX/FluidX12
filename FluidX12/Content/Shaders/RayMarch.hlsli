@@ -198,6 +198,17 @@ float3 LocalToTex3DSpace(float3 pos)
 }
 
 //--------------------------------------------------------------------------------------
+// Get step
+//--------------------------------------------------------------------------------------
+min16float GetStep(min16float transm, min16float opacity, min16float stepScale)
+{
+	min16float step = max((1.0 - transm) * 2.0, 0.8) * stepScale;
+	step *= clamp(1.0 - opacity * 4.0, 0.5, 2.0);
+
+	return step;
+}
+
+//--------------------------------------------------------------------------------------
 // Get light
 //--------------------------------------------------------------------------------------
 #ifdef _LIGHT_PASS_
@@ -238,8 +249,7 @@ float3 GetLight(float3 pos, float3 lightDir, float3 shCoeffs[SH_NUM_COEFF])
 			if (shadow < ZERO_THRESHOLD) break;
 
 			// Update position along light ray
-			step = min16float(max((1.0 - shadow) * 2.0, 0.8)) * g_lightStepScale;
-			step *= clamp(1.0 - opacity * 4.0, 0.5, 2.0);
+			step = GetStep(shadow, opacity, g_lightStepScale);
 			t += step;
 		}
 	}
@@ -273,8 +283,7 @@ float3 GetLight(float3 pos, float3 lightDir, float3 shCoeffs[SH_NUM_COEFF])
 			if (ao < ZERO_THRESHOLD) break;
 
 			// Update position along light ray
-			step = min16float(max((1.0 - ao) * 2.0, 0.8)) * g_lightStepScale;
-			step *= clamp(1.0 - opacity * 4.0, 0.5, 2.0);
+			step = GetStep(ao, opacity, g_lightStepScale);
 			t += step;
 		}
 	}
