@@ -118,7 +118,7 @@
     <None Include="Content\Shaders\Impulse.hlsli">
       <Filter>Shaders\Simulation</Filter>
     </None>
-    <None Include="Content\Shaders\RayCast.hlsli">
+    <None Include="Content\Shaders\Common.hlsli">
       <Filter>Shaders\Rendering</Filter>
     </None>
     <None Include="Content\Shaders\RayMarch.hlsli">

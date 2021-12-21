@@ -106,5 +106,8 @@ min16float4 main(PSIn input) : SV_TARGET
 
 	const float3 uvw = ComputeCubeTexcoord(pos, hitPlane);
 
-	return CubeCast(input.Pos.xy, uvw, pos, rayDir);
+	const min16float4 result = CubeCast(input.Pos.xy, uvw, pos, rayDir);
+	if (result.w <= 0.0) discard;
+
+	return result;
 }

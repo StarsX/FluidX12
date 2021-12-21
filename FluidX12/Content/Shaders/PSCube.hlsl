@@ -22,5 +22,8 @@ min16float4 main(PSIn input) : SV_TARGET
 	const float3 localSpaceEyePt = mul(float4(g_eyePt, 1.0), g_worldI);
 	const float3 rayDir = input.LPt - localSpaceEyePt;
 
-	return CubeCast(input.Pos.xy, input.UVW, input.LPt, rayDir);
+	const min16float4 result = CubeCast(input.Pos.xy, input.UVW, input.LPt, rayDir);
+	if (result.w <= 0.0) discard;
+
+	return result;
 }

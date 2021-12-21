@@ -3,7 +3,7 @@
 //--------------------------------------------------------------------------------------
 
 #include "SharedConsts.h"
-#include "RayCast.hlsli"
+#include "Common.hlsli"
 
 //--------------------------------------------------------------------------------------
 // Texture
@@ -117,8 +117,6 @@ min16float4 CubeCast(uint2 idx, float3 uvw, float3 pos, float3 rayDir)
 
 	//result = min16float4(color); // Reference
 	result = ws > 0.0 ? result / ws : min16float4(color);
-
-	if (result.w <= 0.0) discard;
 
 	return result;
 }

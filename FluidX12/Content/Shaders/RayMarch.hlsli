@@ -2,7 +2,7 @@
 // Copyright (c) XU, Tianchen & ZENG, Wei. All rights reserved.
 //--------------------------------------------------------------------------------------
 
-#include "RayCast.hlsli"
+#include "Common.hlsli"
 #ifdef _HAS_LIGHT_PROBE_
 #define SH_ORDER 3
 #include "SHIrradiance.hlsli"

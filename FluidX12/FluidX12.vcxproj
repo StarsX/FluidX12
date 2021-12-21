@@ -238,7 +238,7 @@ COPY /Y "$(ProjectDir)XUSG\Bin\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir
     <None Include="Content\Shaders\Impulse.hlsli" />
     <None Include="Content\Shaders\CSPoisson.hlsli" />
     <None Include="Content\Shaders\PSCube.hlsli" />
-    <None Include="Content\Shaders\RayCast.hlsli" />
+    <None Include="Content\Shaders\Common.hlsli" />
     <None Include="Content\Shaders\RayMarch.hlsli" />
     <None Include="Content\Shaders\SHIrradiance.hlsli" />
     <None Include="Content\Shaders\SHMath.hlsli" />
