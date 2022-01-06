@@ -46,8 +46,8 @@ bool LightProbe::Init(CommandList* pCommandList, const DescriptorTableCache::spt
 		N_RETURN(textureLoader.CreateTextureFromFile(m_device.get(), pCommandList, fileName,
 			8192, false, m_radiance, uploaders.back().get(), &alphaMode), false);
 
-		texWidth = m_radiance->GetWidth();
-		texHeight = dynamic_pointer_cast<Texture2D, ShaderResource>(m_radiance)->GetHeight();
+		texWidth = static_cast<uint32_t>(m_radiance->GetWidth());
+		texHeight = m_radiance->GetHeight();
 	}
 
 	// Create resources and pipelines
@@ -274,7 +274,7 @@ void LightProbe::shCubeMap(CommandList* pCommandList, uint8_t order)
 	pCommandList->SetComputeRootUnorderedAccessView(2, m_weightSH[0].get());
 	pCommandList->SetComputeDescriptorTable(3, m_srvTable);
 	pCommandList->SetCompute32BitConstant(4, order);
-	pCommandList->SetCompute32BitConstant(4, m_radiance->GetWidth(), SizeOfInUint32(order));
+	pCommandList->SetCompute32BitConstant(4, static_cast<uint32_t>(m_radiance->GetWidth()), SizeOfInUint32(order));
 	pCommandList->SetPipelineState(m_pipelines[SH_CUBE_MAP]);
 
 	pCommandList->Dispatch(DIV_UP(m_numSHTexels, SH_GROUP_SIZE), 1, 1);
