@@ -18,7 +18,7 @@ public:
 		OPTIMIZED = RAY_MARCH_CUBEMAP | SEPARATE_LIGHT_PASS
 	};
 
-	Fluid(const XUSG::Device::sptr& device);
+	Fluid();
 	virtual ~Fluid();
 
 	bool Init(XUSG::CommandList* pCommandList, uint32_t width, uint32_t height,
@@ -84,8 +84,6 @@ protected:
 	void renderCube(XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	void rayCastDirect(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 	void rayCastVDirect(XUSG::CommandList* pCommandList, uint8_t frameIndex);
-
-	XUSG::Device::sptr m_device;
 
 	XUSG::ShaderPool::uptr				m_shaderPool;
 	XUSG::Graphics::PipelineCache::uptr	m_graphicsPipelineCache;

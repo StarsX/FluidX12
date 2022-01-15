@@ -96,7 +96,7 @@ void FluidX::LoadPipeline()
 		dxgiAdapter = nullptr;
 		ThrowIfFailed(factory->EnumAdapters1(i, &dxgiAdapter));
 
-		m_device = Device::MakeShared();
+		m_device = Device::MakeUnique();
 		hr = m_device->Create(dxgiAdapter.get(), D3D_FEATURE_LEVEL_11_0);
 	}
 
@@ -153,14 +153,14 @@ void FluidX::LoadAssets()
 
 	if (!m_radianceFile.empty())
 	{
-		X_RETURN(m_lightProbe, make_unique<LightProbe>(m_device), ThrowIfFailed(E_FAIL));
+		X_RETURN(m_lightProbe, make_unique<LightProbe>(), ThrowIfFailed(E_FAIL));
 		N_RETURN(m_lightProbe->Init(pCommandList, m_descriptorTableCache, uploaders,
 			m_radianceFile.c_str(), g_rtFormat, g_dsFormat), ThrowIfFailed(E_FAIL));
 		N_RETURN(m_lightProbe->CreateDescriptorTables(), ThrowIfFailed(E_FAIL));
 	}
 
 	// Create fast hybrid fluid simulator
-	m_fluid = make_unique<Fluid>(m_device);
+	m_fluid = make_unique<Fluid>();
 	if (!m_fluid) ThrowIfFailed(E_FAIL);
 	if (!m_fluid->Init(pCommandList, m_width, m_height, m_descriptorTableCache, uploaders,
 		Format::B8G8R8A8_UNORM, Format::D24_UNORM_S8_UINT, m_gridSize))

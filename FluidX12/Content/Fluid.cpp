@@ -170,8 +170,7 @@ static inline uint8_t EstimateCubeMapLOD(uint32_t& raySampleCount, uint8_t numMi
 	return min<uint8_t>(level, numMips - 1);
 }
 
-Fluid::Fluid(const Device::sptr& device) :
-	m_device(device), 
+Fluid::Fluid() :
 	m_lightPt(75.0f, 75.0f, -75.0f),
 	m_lightColor(1.0f, 0.7f, 0.3f, XM_PI),
 	m_cubeFaceCount(6),
@@ -184,9 +183,6 @@ Fluid::Fluid(const Device::sptr& device) :
 	m_timeInterval(0.0f)
 {
 	m_shaderPool = ShaderPool::MakeUnique();
-	m_graphicsPipelineCache = Graphics::PipelineCache::MakeUnique(device.get());
-	m_computePipelineCache = Compute::PipelineCache::MakeUnique(device.get());
-	m_pipelineLayoutCache = PipelineLayoutCache::MakeUnique(device.get());
 
 	XMStoreFloat3x4(&m_volumeWorld, XMMatrixScaling(10.0f, 10.0f, 10.0f));
 	m_lightMapWorld = m_volumeWorld;
@@ -200,6 +196,11 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 	const DescriptorTableCache::sptr& descriptorTableCache, vector<Resource::uptr>& uploaders,
 	Format rtFormat, Format dsFormat, const XMUINT3& gridSize)
 {
+	const auto pDevice = pCommandList->GetDevice();
+	m_graphicsPipelineCache = Graphics::PipelineCache::MakeUnique(pDevice);
+	m_computePipelineCache = Compute::PipelineCache::MakeUnique(pDevice);
+	m_pipelineLayoutCache = PipelineLayoutCache::MakeUnique(pDevice);
+
 	m_viewport = XMUINT2(width, height);
 	m_descriptorTableCache = descriptorTableCache;
 	m_gridSize = gridSize;
@@ -209,31 +210,31 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 	for (uint8_t i = 0; i < 2; ++i)
 	{
 		m_velocities[i] = Texture3D::MakeUnique();
-		N_RETURN(m_velocities[i]->Create(m_device.get(), gridSize.x, gridSize.y, gridSize.z, Format::R16G16B16A16_FLOAT,
+		N_RETURN(m_velocities[i]->Create(pDevice, gridSize.x, gridSize.y, gridSize.z, Format::R16G16B16A16_FLOAT,
 			i ? ResourceFlag::ALLOW_UNORDERED_ACCESS : (ResourceFlag::ALLOW_UNORDERED_ACCESS |
 				ResourceFlag::ALLOW_SIMULTANEOUS_ACCESS), 1, MemoryFlag::NONE,
 				(L"Velocity" + to_wstring(i)).c_str()), false);
 
 		m_colors[i] = Texture3D::MakeUnique();
-		N_RETURN(m_colors[i]->Create(m_device.get(), gridSize.x, gridSize.y, gridSize.z, Format::R16G16B16A16_FLOAT,
+		N_RETURN(m_colors[i]->Create(pDevice, gridSize.x, gridSize.y, gridSize.z, Format::R16G16B16A16_FLOAT,
 			ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryFlag::NONE,
 			(L"Color" + to_wstring(i)).c_str()), false);
 	}
 
 	m_incompress = Texture3D::MakeUnique();
-	N_RETURN(m_incompress->Create(m_device.get(), gridSize.x, gridSize.y, gridSize.z, Format::R32_FLOAT,
+	N_RETURN(m_incompress->Create(pDevice, gridSize.x, gridSize.y, gridSize.z, Format::R32_FLOAT,
 		ResourceFlag::ALLOW_UNORDERED_ACCESS, 1, MemoryFlag::NONE,
 		L"Incompressibility"), false);
 
 	m_lightMapSize = gridSize;
 	m_lightMap = Texture3D::MakeUnique();
-	N_RETURN(m_lightMap->Create(m_device.get(), m_lightMapSize.x, m_lightMapSize.y, m_lightMapSize.z,
+	N_RETURN(m_lightMap->Create(pDevice, m_lightMapSize.x, m_lightMapSize.y, m_lightMapSize.z,
 		Format::R11G11B10_FLOAT, ResourceFlag::ALLOW_UNORDERED_ACCESS | ResourceFlag::ALLOW_SIMULTANEOUS_ACCESS,
 		1, MemoryFlag::NONE, L"LightMap"), false);
 
 	const uint8_t numMips = 5;
 	m_cubeMap = Texture2D::MakeUnique();
-	N_RETURN(m_cubeMap->Create(m_device.get(), gridSize.x, gridSize.y, Format::R8G8B8A8_UNORM, 6,
+	N_RETURN(m_cubeMap->Create(pDevice, gridSize.x, gridSize.y, Format::R8G8B8A8_UNORM, 6,
 		ResourceFlag::ALLOW_UNORDERED_ACCESS, numMips, 1, true, MemoryFlag::NONE, L"CubeMap"), false);
 
 	//m_cubeDepth = Texture2D::MakeUnique();
@@ -242,17 +243,17 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 
 	// Create constant buffers
 	m_cbSimulation = ConstantBuffer::MakeUnique();
-	N_RETURN(m_cbSimulation->Create(m_device.get(), sizeof(CBSimulation[FrameCount]), FrameCount,
+	N_RETURN(m_cbSimulation->Create(pDevice, sizeof(CBSimulation[FrameCount]), FrameCount,
 		nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"Fluid.CBSimulation"), false);
 
 	if (m_gridSize.z > 1)
 	{
 		m_cbPerFrame = ConstantBuffer::MakeUnique();
-		N_RETURN(m_cbPerFrame->Create(m_device.get(), sizeof(CBPerFrame[FrameCount]), FrameCount,
+		N_RETURN(m_cbPerFrame->Create(pDevice, sizeof(CBPerFrame[FrameCount]), FrameCount,
 			nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"Fluid.CBPerFrame"), false);
 
 		m_cbPerObject = ConstantBuffer::MakeUnique();
-		N_RETURN(m_cbPerObject->Create(m_device.get(), sizeof(CBPerObject[FrameCount]), FrameCount,
+		N_RETURN(m_cbPerObject->Create(pDevice, sizeof(CBPerObject[FrameCount]), FrameCount,
 			nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"Fluid.CBPerObject"), false);
 	}
 

@@ -18,13 +18,9 @@ struct CBPerFrame
 	DirectX::XMFLOAT4X4	ScreenToWorld;
 };
 
-LightProbe::LightProbe(const Device::sptr& device) :
-	m_device(device)
+LightProbe::LightProbe()
 {
 	m_shaderPool = ShaderPool::MakeUnique();
-	m_graphicsPipelineCache = Graphics::PipelineCache::MakeUnique(device.get());
-	m_computePipelineCache = Compute::PipelineCache::MakeUnique(device.get());
-	m_pipelineLayoutCache = PipelineLayoutCache::MakeUnique(device.get());
 }
 
 LightProbe::~LightProbe()
@@ -34,6 +30,10 @@ LightProbe::~LightProbe()
 bool LightProbe::Init(CommandList* pCommandList, const DescriptorTableCache::sptr& descriptorTableCache,
 	vector<Resource::uptr>& uploaders, const wchar_t* fileName, Format rtFormat, Format dsFormat)
 {
+	const auto pDevice = pCommandList->GetDevice();
+	m_graphicsPipelineCache = Graphics::PipelineCache::MakeUnique(pDevice);
+	m_computePipelineCache = Compute::PipelineCache::MakeUnique(pDevice);
+	m_pipelineLayoutCache = PipelineLayoutCache::MakeUnique(pDevice);
 	m_descriptorTableCache = descriptorTableCache;
 
 	// Load input image
@@ -43,7 +43,7 @@ bool LightProbe::Init(CommandList* pCommandList, const DescriptorTableCache::spt
 		DDS::AlphaMode alphaMode;
 
 		uploaders.emplace_back(Resource::MakeUnique());
-		N_RETURN(textureLoader.CreateTextureFromFile(m_device.get(), pCommandList, fileName,
+		N_RETURN(textureLoader.CreateTextureFromFile(pCommandList, fileName,
 			8192, false, m_radiance, uploaders.back().get(), &alphaMode), false);
 
 		texWidth = static_cast<uint32_t>(m_radiance->GetWidth());
@@ -57,24 +57,24 @@ bool LightProbe::Init(CommandList* pCommandList, const DescriptorTableCache::spt
 	const auto maxElements = SH_MAX_ORDER * SH_MAX_ORDER * numGroups;
 	const auto maxSumElements = SH_MAX_ORDER * SH_MAX_ORDER * numSumGroups;
 	m_coeffSH[0] = StructuredBuffer::MakeShared();
-	m_coeffSH[0]->Create(m_device.get(), maxElements, sizeof(float[3]),
+	m_coeffSH[0]->Create(pDevice, maxElements, sizeof(float[3]),
 		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 		1, nullptr, 1, nullptr, MemoryFlag::NONE, L"SHCoefficients0");
 	m_coeffSH[1] = StructuredBuffer::MakeShared();
-	m_coeffSH[1]->Create(m_device.get(), maxSumElements, sizeof(float[3]),
+	m_coeffSH[1]->Create(pDevice, maxSumElements, sizeof(float[3]),
 		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 		1, nullptr, 1, nullptr, MemoryFlag::NONE, L"SHCoefficients1");
 	m_weightSH[0] = StructuredBuffer::MakeUnique();
-	m_weightSH[0]->Create(m_device.get(), numGroups, sizeof(float),
+	m_weightSH[0]->Create(pDevice, numGroups, sizeof(float),
 		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 		1, nullptr, 1, nullptr, MemoryFlag::NONE, L"SHWeights0");
 	m_weightSH[1] = StructuredBuffer::MakeUnique();
-	m_weightSH[1]->Create(m_device.get(), numSumGroups, sizeof(float),
+	m_weightSH[1]->Create(pDevice, numSumGroups, sizeof(float),
 		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 		1, nullptr, 1, nullptr, MemoryFlag::NONE, L"SHWeights1");
 
 	m_cbPerFrame = ConstantBuffer::MakeUnique();
-	N_RETURN(m_cbPerFrame->Create(m_device.get(), sizeof(CBPerFrame[FrameCount]), FrameCount,
+	N_RETURN(m_cbPerFrame->Create(pDevice, sizeof(CBPerFrame[FrameCount]), FrameCount,
 		nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"LightProbe.CBPerFrame"), false);
 
 	N_RETURN(createPipelineLayouts(), false);
