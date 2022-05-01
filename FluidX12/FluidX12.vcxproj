@@ -90,7 +90,7 @@ COPY /Y "$(OutDir)*.exe" "$(ProjectDir)..\Bin\"
 COPY /Y "$(ProjectDir)XUSG\Bin\$(Configuration)\*.dll" "$(ProjectDir)..\Bin\"</Command>
     </PostBuildEvent>
     <FxCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)Content</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Content;$(ProjectDir)XUSG/Shaders</AdditionalIncludeDirectories>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -112,7 +112,7 @@ COPY /Y "$(OutDir)*.exe" "$(ProjectDir)..\Bin\"
 COPY /Y "$(ProjectDir)XUSG\Bin\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir)..\Bin\"</Command>
     </PostBuildEvent>
     <FxCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)Content</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Content;$(ProjectDir)XUSG/Shaders</AdditionalIncludeDirectories>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -138,7 +138,7 @@ COPY /Y "$(OutDir)*.exe" "$(ProjectDir)..\Bin\"
 COPY /Y "$(ProjectDir)XUSG\Bin\$(Configuration)\*.dll" "$(ProjectDir)..\Bin\"</Command>
     </PostBuildEvent>
     <FxCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)Content</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Content;$(ProjectDir)XUSG/Shaders</AdditionalIncludeDirectories>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -164,7 +164,7 @@ COPY /Y "$(OutDir)*.exe" "$(ProjectDir)..\Bin\"
 COPY /Y "$(ProjectDir)XUSG\Bin\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir)..\Bin\"</Command>
     </PostBuildEvent>
     <FxCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)Content</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Content;$(ProjectDir)XUSG/Shaders</AdditionalIncludeDirectories>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -179,10 +179,11 @@ COPY /Y "$(ProjectDir)XUSG\Bin\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir
     <ClInclude Include="Content\Fluid.h" />
     <ClInclude Include="Content\LightProbe.h" />
     <ClInclude Include="Content\SharedConsts.h" />
-    <ClInclude Include="Content\SHSharedConsts.h" />
     <ClInclude Include="FluidX12.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="XUSG\Advanced\XUSGDDSLoader.h" />
+    <ClInclude Include="XUSG\Advanced\XUSGSHSharedConsts.h" />
+    <ClInclude Include="XUSG\Advanced\XUSGSphericalHarmonics.h" />
     <ClInclude Include="XUSG\Core\XUSG.h" />
   </ItemGroup>
   <ItemGroup>
@@ -234,15 +235,15 @@ COPY /Y "$(ProjectDir)XUSG\Bin\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Content\Shaders\CubeMap.hlsli" />
     <None Include="Content\Shaders\Impulse.hlsli" />
     <None Include="Content\Shaders\CSPoisson.hlsli" />
     <None Include="Content\Shaders\PSCube.hlsli" />
     <None Include="Content\Shaders\Common.hlsli" />
     <None Include="Content\Shaders\RayMarch.hlsli" />
-    <None Include="Content\Shaders\SHIrradiance.hlsli" />
-    <None Include="Content\Shaders\SHMath.hlsli" />
     <None Include="Content\Shaders\Simulation.hlsli" />
+    <None Include="XUSG\Shaders\CubeMap.hlsli" />
+    <None Include="XUSG\Shaders\SHIrradiance.hlsli" />
+    <None Include="XUSG\Shaders\SHIrradianceTypeless.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Content\Shaders\CSAdvect.hlsl">
@@ -308,36 +309,6 @@ COPY /Y "$(ProjectDir)XUSG\Bin\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="Content\Shaders\CSSHCubeMap.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">6.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">6.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.0</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="Content\Shaders\CSSHNormalize.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">5.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">5.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="Content\Shaders\CSSHSum.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">6.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">6.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.0</ShaderModel>
     </FxCompile>
     <FxCompile Include="Content\Shaders\PSCube.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>

@@ -2,8 +2,8 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
-#include "SHSharedConsts.h"
 #include "LightProbe.h"
+#include "Advanced/XUSGSHSharedConsts.h"
 #define _INDEPENDENT_DDS_LOADER_
 #include "Advanced/XUSGDDSLoader.h"
 #undef _INDEPENDENT_DDS_LOADER_
@@ -20,7 +20,7 @@ struct CBPerFrame
 
 LightProbe::LightProbe()
 {
-	m_shaderPool = ShaderPool::MakeUnique();
+	m_shaderPool = ShaderPool::MakeShared();
 }
 
 LightProbe::~LightProbe()
@@ -32,8 +32,8 @@ bool LightProbe::Init(CommandList* pCommandList, const DescriptorTableCache::spt
 {
 	const auto pDevice = pCommandList->GetDevice();
 	m_graphicsPipelineCache = Graphics::PipelineCache::MakeUnique(pDevice);
-	m_computePipelineCache = Compute::PipelineCache::MakeUnique(pDevice);
-	m_pipelineLayoutCache = PipelineLayoutCache::MakeUnique(pDevice);
+	m_computePipelineCache = Compute::PipelineCache::MakeShared(pDevice);
+	m_pipelineLayoutCache = PipelineLayoutCache::MakeShared(pDevice);
 	m_descriptorTableCache = descriptorTableCache;
 
 	// Load input image
@@ -51,28 +51,6 @@ bool LightProbe::Init(CommandList* pCommandList, const DescriptorTableCache::spt
 	}
 
 	// Create resources and pipelines
-	m_numSHTexels = texWidth * texHeight * 6;
-	const auto numGroups = XUSG_DIV_UP(m_numSHTexels, SH_GROUP_SIZE);
-	const auto numSumGroups = XUSG_DIV_UP(numGroups, SH_GROUP_SIZE);
-	const auto maxElements = SH_MAX_ORDER * SH_MAX_ORDER * numGroups;
-	const auto maxSumElements = SH_MAX_ORDER * SH_MAX_ORDER * numSumGroups;
-	m_coeffSH[0] = StructuredBuffer::MakeShared();
-	m_coeffSH[0]->Create(pDevice, maxElements, sizeof(float[3]),
-		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
-		1, nullptr, 1, nullptr, MemoryFlag::NONE, L"SHCoefficients0");
-	m_coeffSH[1] = StructuredBuffer::MakeShared();
-	m_coeffSH[1]->Create(pDevice, maxSumElements, sizeof(float[3]),
-		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
-		1, nullptr, 1, nullptr, MemoryFlag::NONE, L"SHCoefficients1");
-	m_weightSH[0] = StructuredBuffer::MakeUnique();
-	m_weightSH[0]->Create(pDevice, numGroups, sizeof(float),
-		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
-		1, nullptr, 1, nullptr, MemoryFlag::NONE, L"SHWeights0");
-	m_weightSH[1] = StructuredBuffer::MakeUnique();
-	m_weightSH[1]->Create(pDevice, numSumGroups, sizeof(float),
-		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
-		1, nullptr, 1, nullptr, MemoryFlag::NONE, L"SHWeights1");
-
 	m_cbPerFrame = ConstantBuffer::MakeUnique();
 	XUSG_N_RETURN(m_cbPerFrame->Create(pDevice, sizeof(CBPerFrame[FrameCount]), FrameCount,
 		nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"LightProbe.CBPerFrame"), false);
@@ -83,8 +61,12 @@ bool LightProbe::Init(CommandList* pCommandList, const DescriptorTableCache::spt
 	return true;
 }
 
-bool LightProbe::CreateDescriptorTables()
+bool LightProbe::CreateDescriptorTables(Device* pDevice)
 {
+	m_sphericalHarmonics = SphericalHarmonics::MakeUnique();
+	XUSG_N_RETURN(m_sphericalHarmonics->Init(pDevice, m_shaderPool, m_computePipelineCache,
+		m_pipelineLayoutCache, m_descriptorTableCache, 0), false);
+
 	return createDescriptorTables();
 }
 
@@ -96,20 +78,9 @@ void LightProbe::UpdateFrame(uint8_t frameIndex, CXMMATRIX viewProj, const XMFLO
 	XMStoreFloat4x4(&pCbData->ScreenToWorld, XMMatrixTranspose(projToWorld));
 }
 
-void LightProbe::Process(CommandList* pCommandList, uint8_t frameIndex)
+void LightProbe::TransformSH(CommandList* pCommandList)
 {
-	// Set Descriptor pools
-	const DescriptorPool descriptorPools[] =
-	{
-		m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL),
-		m_descriptorTableCache->GetDescriptorPool(SAMPLER_POOL)
-	};
-	pCommandList->SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
-
-	const uint8_t order = 3;
-	shCubeMap(pCommandList, order);
-	shSum(pCommandList, order);
-	shNormalize(pCommandList, order);
+	m_sphericalHarmonics->Transform(pCommandList, m_radiance.get(), m_srvTable);
 }
 
 void LightProbe::RenderEnvironment(const CommandList* pCommandList, uint8_t frameIndex)
@@ -133,45 +104,11 @@ ShaderResource* LightProbe::GetRadiance() const
 
 StructuredBuffer::sptr LightProbe::GetSH() const
 {
-	return m_coeffSH[m_shBufferParity];
+	return m_sphericalHarmonics->GetSHCoefficients();
 }
 
 bool LightProbe::createPipelineLayouts()
 {
-	// SH cube map transform
-	{
-		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique();
-		utilPipelineLayout->SetRange(0, DescriptorType::SAMPLER, 1, 0);
-		utilPipelineLayout->SetRootUAV(1, 0);
-		utilPipelineLayout->SetRootUAV(2, 1);
-		utilPipelineLayout->SetRange(3, DescriptorType::SRV, 1, 0);
-		utilPipelineLayout->SetConstants(4, XUSG_SizeOfInUint32(uint32_t[2]), 0);
-		XUSG_X_RETURN(m_pipelineLayouts[SH_CUBE_MAP], utilPipelineLayout->GetPipelineLayout(
-			m_pipelineLayoutCache.get(), PipelineLayoutFlag::NONE, L"SHCubeMapLayout"), false);
-	}
-
-	// SH sum
-	{
-		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique();
-		utilPipelineLayout->SetRootUAV(0, 0);
-		utilPipelineLayout->SetRootUAV(1, 1);
-		utilPipelineLayout->SetRootSRV(2, 0);
-		utilPipelineLayout->SetRootSRV(3, 1);
-		utilPipelineLayout->SetConstants(4, XUSG_SizeOfInUint32(uint32_t[2]), 0);
-		XUSG_X_RETURN(m_pipelineLayouts[SH_SUM], utilPipelineLayout->GetPipelineLayout(
-			m_pipelineLayoutCache.get(), PipelineLayoutFlag::NONE, L"SHSumLayout"), false);
-	}
-
-	// SH normalize
-	{
-		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique();
-		utilPipelineLayout->SetRootUAV(0, 0);
-		utilPipelineLayout->SetRootSRV(1, 0);
-		utilPipelineLayout->SetRootSRV(2, 1);
-		XUSG_X_RETURN(m_pipelineLayouts[SH_NORMALIZE], utilPipelineLayout->GetPipelineLayout(
-			m_pipelineLayoutCache.get(), PipelineLayoutFlag::NONE, L"SHNormalizeLayout"), false);
-	}
-
 	// Environment mapping
 	{
 		const auto sampler = m_descriptorTableCache->GetSampler(SamplerPreset::LINEAR_WRAP);
@@ -190,49 +127,15 @@ bool LightProbe::createPipelineLayouts()
 
 bool LightProbe::createPipelines(Format rtFormat, Format dsFormat)
 {
-	auto vsIndex = 0u;
-	auto psIndex = 0u;
-	auto csIndex = 0u;
-
-	// SH cube map transform
-	{
-		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::CS, csIndex, L"CSSHCubeMap.cso"), false);
-
-		const auto state = Compute::State::MakeUnique();
-		state->SetPipelineLayout(m_pipelineLayouts[SH_CUBE_MAP]);
-		state->SetShader(m_shaderPool->GetShader(Shader::Stage::CS, csIndex++));
-		XUSG_X_RETURN(m_pipelines[SH_CUBE_MAP], state->GetPipeline(m_computePipelineCache.get(), L"SHCubeMap"), false);
-	}
-
-	// SH sum
-	{
-		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::CS, csIndex, L"CSSHSum.cso"), false);
-
-		const auto state = Compute::State::MakeUnique();
-		state->SetPipelineLayout(m_pipelineLayouts[SH_SUM]);
-		state->SetShader(m_shaderPool->GetShader(Shader::Stage::CS, csIndex++));
-		XUSG_X_RETURN(m_pipelines[SH_SUM], state->GetPipeline(m_computePipelineCache.get(), L"SHSum"), false);
-	}
-
-	// SH sum
-	{
-		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::CS, csIndex, L"CSSHNormalize.cso"), false);
-
-		const auto state = Compute::State::MakeUnique();
-		state->SetPipelineLayout(m_pipelineLayouts[SH_NORMALIZE]);
-		state->SetShader(m_shaderPool->GetShader(Shader::Stage::CS, csIndex));
-		XUSG_X_RETURN(m_pipelines[SH_NORMALIZE], state->GetPipeline(m_computePipelineCache.get(), L"SHNormalize"), false);
-	}
-
 	// Environment mapping
 	{
-		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::VS, vsIndex, L"VSScreenQuad.cso"), false);
-		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::PS, psIndex, L"PSEnvironment.cso"), false);
+		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::VS, ENVIRONMENT, L"VSScreenQuad.cso"), false);
+		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::PS, ENVIRONMENT, L"PSEnvironment.cso"), false);
 
 		const auto state = Graphics::State::MakeUnique();
 		state->SetPipelineLayout(m_pipelineLayouts[ENVIRONMENT]);
-		state->SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, vsIndex++));
-		state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, psIndex++));
+		state->SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, ENVIRONMENT));
+		state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, ENVIRONMENT));
 		state->IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
 		state->DSSetState(Graphics::DEPTH_READ_LESS_EQUAL, m_graphicsPipelineCache.get());
 		state->OMSetRTVFormats(&rtFormat, 1);
@@ -245,12 +148,6 @@ bool LightProbe::createPipelines(Format rtFormat, Format dsFormat)
 
 bool LightProbe::createDescriptorTables()
 {
-	// Create the sampler table
-	const auto descriptorTable = Util::DescriptorTable::MakeUnique();
-	const auto sampler = LINEAR_WRAP;
-	descriptorTable->SetSamplers(0, 1, &sampler, m_descriptorTableCache.get());
-	XUSG_X_RETURN(m_samplerTable, descriptorTable->GetSamplerTable(m_descriptorTableCache.get()), false);
-
 	// Get SRV for cube-map input
 	{
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
@@ -259,80 +156,4 @@ bool LightProbe::createDescriptorTables()
 	}
 
 	return true;
-}
-
-void LightProbe::shCubeMap(CommandList* pCommandList, uint8_t order)
-{
-	assert(order <= SH_MAX_ORDER);
-	ResourceBarrier barrier;
-	m_coeffSH[0]->SetBarrier(&barrier, ResourceState::UNORDERED_ACCESS);	// Promotion
-	m_weightSH[0]->SetBarrier(&barrier, ResourceState::UNORDERED_ACCESS);	// Promotion
-
-	pCommandList->SetComputePipelineLayout(m_pipelineLayouts[SH_CUBE_MAP]);
-	pCommandList->SetComputeDescriptorTable(0, m_samplerTable);
-	pCommandList->SetComputeRootUnorderedAccessView(1, m_coeffSH[0].get());
-	pCommandList->SetComputeRootUnorderedAccessView(2, m_weightSH[0].get());
-	pCommandList->SetComputeDescriptorTable(3, m_srvTable);
-	pCommandList->SetCompute32BitConstant(4, order);
-	pCommandList->SetCompute32BitConstant(4, static_cast<uint32_t>(m_radiance->GetWidth()), XUSG_SizeOfInUint32(order));
-	pCommandList->SetPipelineState(m_pipelines[SH_CUBE_MAP]);
-
-	pCommandList->Dispatch(XUSG_DIV_UP(m_numSHTexels, SH_GROUP_SIZE), 1, 1);
-}
-
-void LightProbe::shSum(CommandList* pCommandList, uint8_t order)
-{
-	assert(order <= SH_MAX_ORDER);
-	ResourceBarrier barriers[4];
-	m_shBufferParity = 0;
-
-	pCommandList->SetComputePipelineLayout(m_pipelineLayouts[SH_SUM]);
-	pCommandList->SetCompute32BitConstant(4, order);
-	pCommandList->SetPipelineState(m_pipelines[SH_SUM]);
-
-	// Promotions
-	m_coeffSH[1]->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
-	m_weightSH[1]->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
-
-	for (auto n = XUSG_DIV_UP(m_numSHTexels, SH_GROUP_SIZE); n > 1; n = XUSG_DIV_UP(n, SH_GROUP_SIZE))
-	{
-		const auto& src = m_shBufferParity;
-		const uint8_t dst = !m_shBufferParity;
-		auto numBarriers = m_coeffSH[dst]->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
-		numBarriers = m_weightSH[dst]->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS, numBarriers);
-		numBarriers = m_coeffSH[src]->SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE, numBarriers);
-		numBarriers = m_weightSH[src]->SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE, numBarriers);
-		pCommandList->Barrier(numBarriers, barriers);
-
-		pCommandList->SetComputeRootUnorderedAccessView(0, m_coeffSH[dst].get());
-		pCommandList->SetComputeRootUnorderedAccessView(1, m_weightSH[dst].get());
-		pCommandList->SetComputeRootShaderResourceView(2, m_coeffSH[src].get());
-		pCommandList->SetComputeRootShaderResourceView(3, m_weightSH[src].get());
-		pCommandList->SetCompute32BitConstant(4, n, XUSG_SizeOfInUint32(order));
-
-		pCommandList->Dispatch(XUSG_DIV_UP(n, SH_GROUP_SIZE), order * order, 1);
-		m_shBufferParity = !m_shBufferParity;
-	}
-}
-
-void LightProbe::shNormalize(CommandList* pCommandList, uint8_t order)
-{
-	assert(order <= SH_MAX_ORDER);
-	ResourceBarrier barriers[3];
-	const auto& src = m_shBufferParity;
-	const uint8_t dst = !m_shBufferParity;
-	auto numBarriers = m_coeffSH[dst]->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
-	numBarriers = m_coeffSH[src]->SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE, numBarriers);
-	numBarriers = m_weightSH[src]->SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE, numBarriers);
-	pCommandList->Barrier(numBarriers, barriers);
-
-	pCommandList->SetComputePipelineLayout(m_pipelineLayouts[SH_NORMALIZE]);
-	pCommandList->SetComputeRootUnorderedAccessView(0, m_coeffSH[dst].get());
-	pCommandList->SetComputeRootShaderResourceView(1, m_coeffSH[src].get());
-	pCommandList->SetComputeRootShaderResourceView(2, m_weightSH[src].get());
-	pCommandList->SetPipelineState(m_pipelines[SH_NORMALIZE]);
-
-	const auto numElements = order * order;
-	pCommandList->Dispatch(XUSG_DIV_UP(numElements, SH_GROUP_SIZE), 1, 1);
-	m_shBufferParity = !m_shBufferParity;
 }

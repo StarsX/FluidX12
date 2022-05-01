@@ -156,7 +156,7 @@ void FluidX::LoadAssets()
 		XUSG_X_RETURN(m_lightProbe, make_unique<LightProbe>(), ThrowIfFailed(E_FAIL));
 		XUSG_N_RETURN(m_lightProbe->Init(pCommandList, m_descriptorTableCache, uploaders,
 			m_radianceFile.c_str(), g_rtFormat, g_dsFormat), ThrowIfFailed(E_FAIL));
-		XUSG_N_RETURN(m_lightProbe->CreateDescriptorTables(), ThrowIfFailed(E_FAIL));
+		XUSG_N_RETURN(m_lightProbe->CreateDescriptorTables(m_device.get()), ThrowIfFailed(E_FAIL));
 	}
 
 	// Create fast hybrid fluid simulator
@@ -377,23 +377,23 @@ void FluidX::PopulateCommandList()
 	XUSG_N_RETURN(pCommandList->Reset(pCommandAllocator, nullptr), ThrowIfFailed(E_FAIL));
 
 	// Record commands.
+	if (m_lightProbe)
+	{
+		static auto isFirstFrame = true;
+		if (isFirstFrame)
+		{
+			m_lightProbe->TransformSH(pCommandList);
+			m_fluid->SetSH(m_lightProbe->GetSH());
+			isFirstFrame = false;
+		}
+	}
+
 	const DescriptorPool descriptorPools[] =
 	{
 		m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL),
 		m_descriptorTableCache->GetDescriptorPool(SAMPLER_POOL)
 	};
 	pCommandList->SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
-
-	if (m_lightProbe)
-	{
-		static auto isFirstFrame = true;
-		if (isFirstFrame)
-		{
-			m_lightProbe->Process(pCommandList, m_frameIndex);
-			m_fluid->SetSH(m_lightProbe->GetSH());
-			isFirstFrame = false;
-		}
-	}
 
 	// Fluid simulation
 	m_fluid->Simulate(pCommandList, m_frameIndex);

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "Core/XUSG.h"
+#include "Advanced/XUSGSphericalHarmonics.h"
 
 class LightProbe
 {
@@ -15,10 +16,10 @@ public:
 	bool Init(XUSG::CommandList* pCommandList, const XUSG::DescriptorTableCache::sptr& descriptorTableCache,
 		std::vector<XUSG::Resource::uptr>& uploaders, const wchar_t* fileName,
 		XUSG::Format rtFormat, XUSG::Format dsFormat);
-	bool CreateDescriptorTables();
+	bool CreateDescriptorTables(XUSG::Device* pDevice);
 
 	void UpdateFrame(uint8_t frameIndex, DirectX::CXMMATRIX viewProj, const DirectX::XMFLOAT3& eyePt);
-	void Process(XUSG::CommandList* pCommandList, uint8_t frameIndex);
+	void TransformSH(XUSG::CommandList* pCommandList);
 	void RenderEnvironment(const XUSG::CommandList* pCommandList, uint8_t frameIndex);
 
 	XUSG::ShaderResource* GetRadiance() const;
@@ -30,9 +31,6 @@ public:
 protected:
 	enum PipelineIndex : uint8_t
 	{
-		SH_CUBE_MAP,
-		SH_SUM,
-		SH_NORMALIZE,
 		ENVIRONMENT,
 
 		NUM_PIPELINE
@@ -42,29 +40,20 @@ protected:
 	bool createPipelines(XUSG::Format rtFormat, XUSG::Format dsFormat);
 	bool createDescriptorTables();
 
-	void shCubeMap(XUSG::CommandList* pCommandList, uint8_t order);
-	void shSum(XUSG::CommandList* pCommandList, uint8_t order);
-	void shNormalize(XUSG::CommandList* pCommandList, uint8_t order);
-
-	XUSG::ShaderPool::uptr				m_shaderPool;
+	XUSG::ShaderPool::sptr				m_shaderPool;
 	XUSG::Graphics::PipelineCache::uptr	m_graphicsPipelineCache;
-	XUSG::Compute::PipelineCache::uptr	m_computePipelineCache;
-	XUSG::PipelineLayoutCache::uptr		m_pipelineLayoutCache;
+	XUSG::Compute::PipelineCache::sptr	m_computePipelineCache;
+	XUSG::PipelineLayoutCache::sptr		m_pipelineLayoutCache;
 	XUSG::DescriptorTableCache::sptr	m_descriptorTableCache;
 
 	XUSG::PipelineLayout	m_pipelineLayouts[NUM_PIPELINE];
 	XUSG::Pipeline			m_pipelines[NUM_PIPELINE];
 
+	XUSG::SphericalHarmonics::uptr m_sphericalHarmonics;
+
 	XUSG::DescriptorTable	m_srvTable;
-	XUSG::DescriptorTable	m_samplerTable;
 
 	XUSG::Texture::sptr	m_radiance;
 
-	XUSG::StructuredBuffer::sptr m_coeffSH[2];
-	XUSG::StructuredBuffer::uptr m_weightSH[2];
-
 	XUSG::ConstantBuffer::uptr m_cbPerFrame;
-
-	uint32_t	m_numSHTexels;
-	uint8_t		m_shBufferParity;
 };

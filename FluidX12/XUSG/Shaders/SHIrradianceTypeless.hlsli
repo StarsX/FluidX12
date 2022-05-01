@@ -2,22 +2,15 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
-#define PI 3.1415926535897
-#define SH_NUM_COEFF (SH_ORDER * SH_ORDER)
+#ifndef T
+#define T StructuredBuffer<float3>
+#endif
 
-//--------------------------------------------------------------------------------------
-// Load spherical harmonics
-//--------------------------------------------------------------------------------------
-void LoadSH(out float3 shCoeffs[SH_NUM_COEFF], StructuredBuffer<float3> roSHCoeffs)
-{
-	[unroll]
-	for (uint i = 0; i < SH_NUM_COEFF; ++i) shCoeffs[i] = roSHCoeffs[i];
-}
+#ifndef SH_COEFFS
+#define SH_COEFFS shCoeffs
+#endif
 
-//--------------------------------------------------------------------------------------
-// Evaluate irradiance using spherical harmonics
-//--------------------------------------------------------------------------------------
-float3 EvaluateSHIrradiance(float3 shCoeffs[SH_NUM_COEFF], float3 norm)
+float3 EvaluateSHIrradiance(T SH_COEFFS, float3 norm)
 {
 	const float c1 = 0.42904276540489171563379376569857;	// 4 * A2.Y22 = 1/16 * sqrt(15.PI)
 	const float c2 = 0.51166335397324424423977581244463;	// 0.5 * A1.Y10 = 1/2 * sqrt(PI/3)
@@ -36,12 +29,4 @@ float3 EvaluateSHIrradiance(float3 shCoeffs[SH_NUM_COEFF], float3 norm)
 		+ 2.0 * c2 * (shCoeffs[3] * x + shCoeffs[1] * y + shCoeffs[2] * z));			// 2.c2.(L11.x + L1-1.y + L10.z)
 
 	return irradiance / PI;
-}
-
-float3 EvaluateSHIrradiance(StructuredBuffer<float3> roSHCoeffs, float3 norm)
-{
-	float3 shCoeffs[SH_NUM_COEFF];
-	LoadSH(shCoeffs, roSHCoeffs);
-
-	return EvaluateSHIrradiance(shCoeffs, norm);
 }

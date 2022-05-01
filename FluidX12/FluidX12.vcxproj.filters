@@ -84,8 +84,11 @@
     <ClInclude Include="XUSG\Advanced\XUSGDDSLoader.h">
       <Filter>XUSG</Filter>
     </ClInclude>
-    <ClInclude Include="Content\SHSharedConsts.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="XUSG\Advanced\XUSGSHSharedConsts.h">
+      <Filter>XUSG</Filter>
+    </ClInclude>
+    <ClInclude Include="XUSG\Advanced\XUSGSphericalHarmonics.h">
+      <Filter>XUSG</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -127,17 +130,17 @@
     <None Include="Content\Shaders\Simulation.hlsli">
       <Filter>Shaders\Simulation</Filter>
     </None>
-    <None Include="Content\Shaders\SHIrradiance.hlsli">
-      <Filter>Shaders\Rendering\SHMath</Filter>
-    </None>
-    <None Include="Content\Shaders\SHMath.hlsli">
-      <Filter>Shaders\Rendering\SHMath</Filter>
-    </None>
-    <None Include="Content\Shaders\CubeMap.hlsli">
-      <Filter>Shaders\Rendering</Filter>
-    </None>
     <None Include="Content\Shaders\PSCube.hlsli">
       <Filter>Shaders\Rendering</Filter>
+    </None>
+    <None Include="XUSG\Shaders\CubeMap.hlsli">
+      <Filter>Shaders\Rendering\SHMath</Filter>
+    </None>
+    <None Include="XUSG\Shaders\SHIrradiance.hlsli">
+      <Filter>Shaders\Rendering\SHMath</Filter>
+    </None>
+    <None Include="XUSG\Shaders\SHIrradianceTypeless.hlsli">
+      <Filter>Shaders\Rendering\SHMath</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -164,15 +167,6 @@
     </FxCompile>
     <FxCompile Include="Content\Shaders\CSRayMarchL.hlsl">
       <Filter>Shaders\Rendering</Filter>
-    </FxCompile>
-    <FxCompile Include="Content\Shaders\CSSHCubeMap.hlsl">
-      <Filter>Shaders\Rendering\SHMath</Filter>
-    </FxCompile>
-    <FxCompile Include="Content\Shaders\CSSHNormalize.hlsl">
-      <Filter>Shaders\Rendering\SHMath</Filter>
-    </FxCompile>
-    <FxCompile Include="Content\Shaders\CSSHSum.hlsl">
-      <Filter>Shaders\Rendering\SHMath</Filter>
     </FxCompile>
     <FxCompile Include="Content\Shaders\CSRayMarch.hlsl">
       <Filter>Shaders\Rendering</Filter>
