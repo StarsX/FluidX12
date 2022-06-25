@@ -85,7 +85,7 @@ void FluidX::LoadPipeline()
 	}
 #endif
 
-	com_ptr<IDXGIFactory4> factory;
+	com_ptr<IDXGIFactory5> factory;
 	ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
 
 	DXGI_ADAPTER_DESC1 dxgiAdapterDesc;
@@ -113,7 +113,7 @@ void FluidX::LoadPipeline()
 	// Describe and create the swap chain.
 	m_swapChain = SwapChain::MakeUnique();
 	XUSG_N_RETURN(m_swapChain->Create(factory.get(), Win32Application::GetHwnd(), m_commandQueue.get(),
-		FrameCount, m_width, m_height, g_rtFormat), ThrowIfFailed(E_FAIL));
+		FrameCount, m_width, m_height, g_rtFormat, SwapChainFlag::ALLOW_TEARING), ThrowIfFailed(E_FAIL));
 
 	// This sample does not support fullscreen transitions.
 	ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_NO_ALT_ENTER));
@@ -235,7 +235,7 @@ void FluidX::OnRender()
 	m_commandQueue->ExecuteCommandList(m_commandList.get());
 
 	// Present the frame.
-	XUSG_N_RETURN(m_swapChain->Present(0, 0), ThrowIfFailed(E_FAIL));
+	XUSG_N_RETURN(m_swapChain->Present(0, PresentFlag::ALLOW_TEARING), ThrowIfFailed(E_FAIL));
 
 	MoveToNextFrame();
 }
