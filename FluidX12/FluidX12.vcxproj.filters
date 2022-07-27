@@ -42,9 +42,6 @@
     <ClInclude Include="Common\d3dx12.h">
       <Filter>Common\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Common\dxcapi.h">
-      <Filter>Common\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Common\DXFramework.h">
       <Filter>Common\Header Files</Filter>
     </ClInclude>
@@ -89,6 +86,15 @@
     </ClInclude>
     <ClInclude Include="XUSG\Advanced\XUSGSphericalHarmonics.h">
       <Filter>XUSG</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\d3dcommon.h">
+      <Filter>Common\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\dxgicommon.h">
+      <Filter>Common\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\dxgiformat.h">
+      <Filter>Common\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
