@@ -81,8 +81,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
 			LoadSH(shCoeffs, g_roSHCoeffs);
 			float3 rayDir = -GetDensityGradient(uvw);
 			rayDir = any(abs(rayDir) > 0.0) ? rayDir : rayOrigin.xyz; // Avoid 0-gradient caused by uniform density field
-			irradiance = GetIrradiance(shCoeffs, mul(rayDir, (float3x3)g_world));
 			rayDir = normalize(rayDir);
+			irradiance = GetIrradiance(shCoeffs, mul(rayDir, (float3x3)g_world));
 
 			float t = g_stepScale;
 			min16float step = g_stepScale;

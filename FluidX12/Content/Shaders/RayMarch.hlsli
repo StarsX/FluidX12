@@ -261,9 +261,9 @@ float3 GetLight(float3 pos, float3 lightDir, float3 shCoeffs[SH_NUM_COEFF])
 	{
 		const float3 uvw = LocalToTex3DSpace(pos);
 		float3 rayDir = -GetDensityGradient(uvw);
-		rayDir = any(abs(rayDir) > 0.0) ? rayDir : pos; // Avoid 0-gradient caused by uniform density field 
-		irradiance = GetIrradiance(shCoeffs, mul(rayDir, (float3x3)g_world));
+		rayDir = any(abs(rayDir) > 0.0) ? rayDir : pos; // Avoid 0-gradient caused by uniform density field
 		rayDir = normalize(rayDir);
+		irradiance = GetIrradiance(shCoeffs, mul(rayDir, (float3x3)g_world));
 
 		float t = g_lightStepScale;
 		min16float step = g_lightStepScale;
