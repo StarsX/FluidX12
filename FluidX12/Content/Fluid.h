@@ -64,14 +64,6 @@ protected:
 
 		NUM_SRV_UAV_TABLE
 	};
-	
-	enum SamplerTable : uint8_t
-	{
-		SAMPLER_TABLE_MIRROR,
-		SAMPLER_TABLE_CLAMP,
-		
-		NUM_SAMPLER_TABLE
-	};
 
 	bool createPipelineLayouts();
 	bool createPipelines(XUSG::Format rtFormat, XUSG::Format dsFormat);
@@ -97,7 +89,6 @@ protected:
 	std::vector<XUSG::DescriptorTable> m_uavMipTables;
 	std::vector<XUSG::DescriptorTable> m_srvMipTables;
 	XUSG::DescriptorTable	m_srvUavTables[NUM_SRV_UAV_TABLE];
-	XUSG::DescriptorTable	m_samplerTables[NUM_SAMPLER_TABLE];
 	XUSG::DescriptorTable	m_cbvTables[FrameCount];
 
 	XUSG::Texture3D::uptr	m_incompress;

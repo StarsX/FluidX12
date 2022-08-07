@@ -380,8 +380,7 @@ void Fluid::Simulate(CommandList* pCommandList, uint8_t frameIndex)
 		// Set descriptor tables
 		pCommandList->SetComputeRootConstantBufferView(0, m_cbSimulation.get(), m_cbSimulation->GetCBVOffset(frameIndex));
 		pCommandList->SetComputeDescriptorTable(1, m_srvUavTables[SRV_UAV_TABLE_VECOLITY]);
-		pCommandList->SetComputeDescriptorTable(2, m_samplerTables[SAMPLER_TABLE_MIRROR]);
-		pCommandList->SetComputeDescriptorTable(3, m_srvUavTables[SRV_UAV_TABLE_COLOR + m_frameParity]);
+		pCommandList->SetComputeDescriptorTable(2, m_srvUavTables[SRV_UAV_TABLE_COLOR + m_frameParity]);
 
 		pCommandList->Dispatch(XUSG_DIV_UP(m_gridSize.x, 8), XUSG_DIV_UP(m_gridSize.y, 8), m_gridSize.z);
 	}
@@ -461,13 +460,15 @@ bool Fluid::createPipelineLayouts()
 {
 	// Advection
 	{
+		const auto sampler = m_descriptorTableCache->GetSampler(SamplerPreset::LINEAR_MIRROR);
+
 		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
 		pipelineLayout->SetRootCBV(0, 0);
 		pipelineLayout->SetRange(1, DescriptorType::SRV, 1, 0);
 		pipelineLayout->SetRange(1, DescriptorType::UAV, 1, 0, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
-		pipelineLayout->SetRange(2, DescriptorType::SAMPLER, 1, 0);
-		pipelineLayout->SetRange(3, DescriptorType::SRV, 1, 1);
-		pipelineLayout->SetRange(3, DescriptorType::UAV, 1, 1, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
+		pipelineLayout->SetRange(2, DescriptorType::SRV, 1, 1);
+		pipelineLayout->SetRange(2, DescriptorType::UAV, 1, 1, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
+		pipelineLayout->SetStaticSamplers(&sampler, 1, 0);
 		XUSG_X_RETURN(m_pipelineLayouts[ADVECT], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::NONE, L"AdvectionLayout"), false);
 	}
@@ -482,6 +483,8 @@ bool Fluid::createPipelineLayouts()
 			PipelineLayoutFlag::NONE, L"ProjectionLayout"), false);
 	}
 
+	const auto sampler = m_descriptorTableCache->GetSampler(SamplerPreset::LINEAR_CLAMP);
+
 	if (m_gridSize.z > 1)
 	{
 		// Ray marching
@@ -490,14 +493,14 @@ bool Fluid::createPipelineLayouts()
 			pipelineLayout->SetRange(0, DescriptorType::CBV, 2, 0, 0, DescriptorFlag::DATA_STATIC);
 			pipelineLayout->SetRange(1, DescriptorType::UAV, 1, 0, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
 			pipelineLayout->SetRange(2, DescriptorType::SRV, 1, 0);
-			pipelineLayout->SetRange(3, DescriptorType::SAMPLER, 1, 0);
-			pipelineLayout->SetConstants(4, 3, 2);
-			pipelineLayout->SetRootSRV(5, 1);
+			pipelineLayout->SetConstants(3, 3, 2);
+			pipelineLayout->SetRootSRV(4, 1);
 #if _CPU_CUBE_FACE_CULL_ == 1
-			pipelineLayout->SetConstants(6, 1, 3);
+			pipelineLayout->SetConstants(5, 1, 3);
 #elif _CPU_CUBE_FACE_CULL_ == 2
-			pipelineLayout->SetRootCBV(6, 3);
+			pipelineLayout->SetRootCBV(5, 3);
 #endif
+			pipelineLayout->SetStaticSamplers(&sampler, 1, 0);
 			XUSG_X_RETURN(m_pipelineLayouts[RAY_MARCH], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 				PipelineLayoutFlag::NONE, L"RayMarchingLayout"), false);
 		}
@@ -508,9 +511,9 @@ bool Fluid::createPipelineLayouts()
 			pipelineLayout->SetRange(0, DescriptorType::CBV, 2, 0, 0, DescriptorFlag::DATA_STATIC);
 			pipelineLayout->SetRange(1, DescriptorType::SRV, 1, 0);
 			pipelineLayout->SetRange(2, DescriptorType::UAV, 1, 0, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
-			pipelineLayout->SetRange(3, DescriptorType::SAMPLER, 1, 0);
-			pipelineLayout->SetConstants(4, 2, 2);
-			pipelineLayout->SetRootSRV(5, 1);
+			pipelineLayout->SetConstants(3, 2, 2);
+			pipelineLayout->SetRootSRV(4, 1);
+			pipelineLayout->SetStaticSamplers(&sampler, 1, 0);
 			XUSG_X_RETURN(m_pipelineLayouts[RAY_MARCH_L], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 				PipelineLayoutFlag::NONE, L"LightSpaceRayMarchingLayout"), false);
 		}
@@ -521,13 +524,13 @@ bool Fluid::createPipelineLayouts()
 			pipelineLayout->SetRange(0, DescriptorType::CBV, 2, 0, 0, DescriptorFlag::DATA_STATIC);
 			pipelineLayout->SetRange(1, DescriptorType::UAV, 1, 0, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
 			pipelineLayout->SetRange(2, DescriptorType::SRV, 2, 0);
-			pipelineLayout->SetRange(3, DescriptorType::SAMPLER, 1, 0);
-			pipelineLayout->SetConstants(4, 1, 2);
+			pipelineLayout->SetConstants(3, 1, 2);
 #if _CPU_CUBE_FACE_CULL_ == 1
-			pipelineLayout->SetConstants(5, 1, 3);
+			pipelineLayout->SetConstants(4, 1, 3);
 #elif _CPU_CUBE_FACE_CULL_ == 2
-			pipelineLayout->SetRootCBV(5, 3);
+			pipelineLayout->SetRootCBV(4, 3);
 #endif
+			pipelineLayout->SetStaticSamplers(&sampler, 1, 0);
 			XUSG_X_RETURN(m_pipelineLayouts[RAY_MARCH_V], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 				PipelineLayoutFlag::NONE, L"ViewSpaceRayMarchingLayout"), false);
 		}
@@ -537,9 +540,8 @@ bool Fluid::createPipelineLayouts()
 			const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
 			pipelineLayout->SetRange(0, DescriptorType::CBV, 2, 0, 0, DescriptorFlag::DATA_STATIC);
 			pipelineLayout->SetRange(1, DescriptorType::SRV, 3, 0);
-			pipelineLayout->SetRange(2, DescriptorType::SAMPLER, 1, 0);
+			pipelineLayout->SetStaticSamplers(&sampler, 1, 0, 0, Shader::Stage::PS);
 			pipelineLayout->SetShaderStage(1, Shader::Stage::PS);
-			pipelineLayout->SetShaderStage(2, Shader::Stage::PS);
 			XUSG_X_RETURN(m_pipelineLayouts[RENDER_CUBE], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 				PipelineLayoutFlag::NONE, L"CubeLayout"), false);
 		}
@@ -549,13 +551,11 @@ bool Fluid::createPipelineLayouts()
 			const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
 			pipelineLayout->SetRange(0, DescriptorType::CBV, 2, 0, 0, DescriptorFlag::DATA_STATIC);
 			pipelineLayout->SetRange(1, DescriptorType::SRV, 1, 0);
-			pipelineLayout->SetRange(2, DescriptorType::SAMPLER, 1, 0);
-			pipelineLayout->SetConstants(3, 3, 2, 0, Shader::Stage::PS);
-			pipelineLayout->SetRootSRV(4, 1, 0, DescriptorFlag::NONE, Shader::Stage::PS);
+			pipelineLayout->SetConstants(2, 3, 2, 0, Shader::Stage::PS);
+			pipelineLayout->SetRootSRV(3, 1, 0, DescriptorFlag::NONE, Shader::Stage::PS);
+			pipelineLayout->SetStaticSamplers(&sampler, 1, 0, 0, Shader::Stage::PS);
 			pipelineLayout->SetShaderStage(0, Shader::Stage::PS);
 			pipelineLayout->SetShaderStage(1, Shader::Stage::PS);
-			pipelineLayout->SetShaderStage(2, Shader::Stage::PS);
-			pipelineLayout->SetShaderStage(3, Shader::Stage::PS);
 			XUSG_X_RETURN(m_pipelineLayouts[DIRECT_RAY_CAST], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 				PipelineLayoutFlag::NONE, L"DirectRayCastingLayout"), false);
 		}
@@ -565,12 +565,10 @@ bool Fluid::createPipelineLayouts()
 			const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
 			pipelineLayout->SetRange(0, DescriptorType::CBV, 2, 0, 0, DescriptorFlag::DATA_STATIC);
 			pipelineLayout->SetRange(1, DescriptorType::SRV, 2, 0);
-			pipelineLayout->SetRange(2, DescriptorType::SAMPLER, 1, 0);
-			pipelineLayout->SetConstants(3, 1, 2, 0, Shader::Stage::PS);
+			pipelineLayout->SetConstants(2, 1, 2, 0, Shader::Stage::PS);
+			pipelineLayout->SetStaticSamplers(&sampler, 1, 0, 0, Shader::Stage::PS);
 			pipelineLayout->SetShaderStage(0, Shader::Stage::PS);
 			pipelineLayout->SetShaderStage(1, Shader::Stage::PS);
-			pipelineLayout->SetShaderStage(2, Shader::Stage::PS);
-			pipelineLayout->SetShaderStage(3, Shader::Stage::PS);
 			XUSG_X_RETURN(m_pipelineLayouts[DIRECT_RAY_CAST_V], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 				PipelineLayoutFlag::NONE, L"ViewSpaceDirectRayCastingLayout"), false);
 		}
@@ -580,9 +578,8 @@ bool Fluid::createPipelineLayouts()
 		// Visualization
 		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
 		pipelineLayout->SetRange(0, DescriptorType::SRV, 1, 0);
-		pipelineLayout->SetRange(1, DescriptorType::SAMPLER, 1, 0);
+		pipelineLayout->SetStaticSamplers(&sampler, 1, 0, 0, Shader::Stage::PS);
 		pipelineLayout->SetShaderStage(0, Shader::PS);
-		pipelineLayout->SetShaderStage(1, Shader::PS);
 		XUSG_X_RETURN(m_pipelineLayouts[VISUALIZE], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::NONE, L"DirectRayCastingLayout"), false);
 	}
@@ -812,25 +809,11 @@ bool Fluid::createDescriptorTables()
 		XUSG_X_RETURN(m_srvMipTables[i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 	}
 
+	// Create URV table
 	{
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0,1, &m_lightMap->GetUAV());
 		XUSG_X_RETURN(m_srvUavTables[UAV_TABLE_LIGHT_MAP], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
-	}
-	
-	// Create the samplers
-	{
-		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
-		const auto samplerLinearMirror = SamplerPreset::LINEAR_MIRROR;
-		descriptorTable->SetSamplers(0, 1, &samplerLinearMirror, m_descriptorTableCache.get());
-		XUSG_X_RETURN(m_samplerTables[SAMPLER_TABLE_MIRROR], descriptorTable->GetSamplerTable(m_descriptorTableCache.get()), false);
-	}
-
-	{
-		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
-		const auto samplerLinearClamp = SamplerPreset::LINEAR_CLAMP;
-		descriptorTable->SetSamplers(0, 1, &samplerLinearClamp, m_descriptorTableCache.get());
-		XUSG_X_RETURN(m_samplerTables[SAMPLER_TABLE_CLAMP], descriptorTable->GetSamplerTable(m_descriptorTableCache.get()), false);
 	}
 
 	return true;
@@ -846,7 +829,6 @@ void Fluid::visualizeColor(const CommandList* pCommandList)
 
 	// Set descriptor tables
 	pCommandList->SetGraphicsDescriptorTable(0, m_srvUavTables[SRV_UAV_TABLE_COLOR + !m_frameParity]);
-	pCommandList->SetGraphicsDescriptorTable(1, m_samplerTables[SAMPLER_TABLE_CLAMP]);
 
 	pCommandList->Draw(3, 1, 0, 0);
 }
@@ -868,15 +850,14 @@ void Fluid::rayMarch(CommandList* pCommandList, uint8_t frameIndex)
 	pCommandList->SetComputeDescriptorTable(0, m_cbvTables[frameIndex]);
 	pCommandList->SetComputeDescriptorTable(1, m_uavMipTables[m_cubeMapLOD]);
 	pCommandList->SetComputeDescriptorTable(2, m_srvUavTables[SRV_TABLE_RAY_MARCH + !m_frameParity]);
-	pCommandList->SetComputeDescriptorTable(3, m_samplerTables[SAMPLER_TABLE_CLAMP]);
-	pCommandList->SetCompute32BitConstant(4, m_raySampleCount);
-	pCommandList->SetCompute32BitConstant(4, m_coeffSH ? 1 : 0, 1);
-	pCommandList->SetCompute32BitConstant(4, m_maxLightSamples, 2);
-	if (m_coeffSH) pCommandList->SetComputeRootShaderResourceView(5, m_coeffSH.get());
+	pCommandList->SetCompute32BitConstant(3, m_raySampleCount);
+	pCommandList->SetCompute32BitConstant(3, m_coeffSH ? 1 : 0, 1);
+	pCommandList->SetCompute32BitConstant(3, m_maxLightSamples, 2);
+	if (m_coeffSH) pCommandList->SetComputeRootShaderResourceView(4, m_coeffSH.get());
 #if _CPU_CUBE_FACE_CULL_ == 1
-	pCommandList->SetCompute32BitConstant(6, m_visibilityMask);
+	pCommandList->SetCompute32BitConstant(5, m_visibilityMask);
 #elif _CPU_CUBE_FACE_CULL_ == 2
-	pCommandList->SetComputeRootConstantBufferView(6, m_cbCubeFaceList.get(), m_cbCubeFaceList->GetCBVOffset(frameIndex));
+	pCommandList->SetComputeRootConstantBufferView(5, m_cbCubeFaceList.get(), m_cbCubeFaceList->GetCBVOffset(frameIndex));
 #endif
 
 	// Dispatch cube
@@ -899,10 +880,9 @@ void Fluid::rayMarchL(const CommandList* pCommandList, uint8_t frameIndex)
 	//pCommandList->SetComputeRootConstantBufferView(0, m_cbPerObject.get(), m_cbPerObject->GetCBVOffset(frameIndex));
 	pCommandList->SetComputeDescriptorTable(1, m_srvUavTables[SRV_TABLE_RAY_MARCH + !m_frameParity]);
 	pCommandList->SetComputeDescriptorTable(2, m_srvUavTables[UAV_TABLE_LIGHT_MAP]);
-	pCommandList->SetComputeDescriptorTable(3, m_samplerTables[SAMPLER_TABLE_CLAMP]);
-	pCommandList->SetCompute32BitConstant(4, m_maxLightSamples);
-	pCommandList->SetCompute32BitConstant(4, m_coeffSH ? 1 : 0, 1);
-	if (m_coeffSH) pCommandList->SetComputeRootShaderResourceView(5, m_coeffSH.get());
+	pCommandList->SetCompute32BitConstant(3, m_maxLightSamples);
+	pCommandList->SetCompute32BitConstant(3, m_coeffSH ? 1 : 0, 1);
+	if (m_coeffSH) pCommandList->SetComputeRootShaderResourceView(4, m_coeffSH.get());
 
 	// Dispatch grid
 	pCommandList->Dispatch(XUSG_DIV_UP(m_lightMapSize.x, 4), XUSG_DIV_UP(m_lightMapSize.y, 4), XUSG_DIV_UP(m_lightMapSize.z, 4));
@@ -926,12 +906,11 @@ void Fluid::rayMarchV(CommandList* pCommandList, uint8_t frameIndex)
 	//pCommandList->SetComputeRootConstantBufferView(0, m_cbPerObject.get(), m_cbPerObject->GetCBVOffset(frameIndex));
 	pCommandList->SetComputeDescriptorTable(1, m_uavMipTables[m_cubeMapLOD]);
 	pCommandList->SetComputeDescriptorTable(2, m_srvUavTables[SRV_TABLE_RAY_MARCH + !m_frameParity]);
-	pCommandList->SetComputeDescriptorTable(3, m_samplerTables[SAMPLER_TABLE_CLAMP]);
-	pCommandList->SetCompute32BitConstant(4, m_raySampleCount);
+	pCommandList->SetCompute32BitConstant(3, m_raySampleCount);
 #if _CPU_CUBE_FACE_CULL_ == 1
-	pCommandList->SetCompute32BitConstant(5, m_visibilityMask);
+	pCommandList->SetCompute32BitConstant(4, m_visibilityMask);
 #elif _CPU_CUBE_FACE_CULL_ == 2
-	pCommandList->SetComputeRootConstantBufferView(5, m_cbCubeFaceList.get(), m_cbCubeFaceList->GetCBVOffset(frameIndex));
+	pCommandList->SetComputeRootConstantBufferView(4, m_cbCubeFaceList.get(), m_cbCubeFaceList->GetCBVOffset(frameIndex));
 #endif
 
 	// Dispatch cube
@@ -958,7 +937,6 @@ void Fluid::renderCube(CommandList* pCommandList, uint8_t frameIndex)
 	pCommandList->SetGraphicsDescriptorTable(0, m_cbvTables[frameIndex]);
 	//pCommandList->SetGraphicsRootConstantBufferView(0, m_cbPerObject.get(), m_cbPerObject->GetCBVOffset(frameIndex));
 	pCommandList->SetGraphicsDescriptorTable(1, m_srvMipTables[m_cubeMapLOD]);
-	pCommandList->SetGraphicsDescriptorTable(2, m_samplerTables[SAMPLER_TABLE_CLAMP]);
 
 	pCommandList->IASetPrimitiveTopology(PrimitiveTopology::TRIANGLESTRIP);
 	pCommandList->Draw(4, 6, 0, 0);
@@ -976,11 +954,11 @@ void Fluid::rayCastDirect(const CommandList* pCommandList, uint8_t frameIndex)
 	pCommandList->SetGraphicsDescriptorTable(0, m_cbvTables[frameIndex]);
 	//pCommandList->SetGraphicsRootConstantBufferView(0, m_cbPerObject.get(), m_cbPerObject->GetCBVOffset(frameIndex));
 	pCommandList->SetGraphicsDescriptorTable(1, m_srvUavTables[SRV_TABLE_RAY_MARCH + !m_frameParity]);
-	pCommandList->SetGraphicsDescriptorTable(2, m_samplerTables[SAMPLER_TABLE_CLAMP]);
-	pCommandList->SetGraphics32BitConstant(3, m_maxRaySamples);
-	pCommandList->SetGraphics32BitConstant(3, m_coeffSH ? 1 : 0, 1);
-	pCommandList->SetGraphics32BitConstant(3, m_maxLightSamples, 2);
-	if (m_coeffSH) pCommandList->SetGraphicsRootShaderResourceView(4, m_coeffSH.get());
+	pCommandList->SetGraphics32BitConstant(2, m_maxRaySamples);
+	pCommandList->SetGraphics32BitConstant(2, m_coeffSH ? 1 : 0, 1);
+	pCommandList->SetGraphics32BitConstant(2, m_maxLightSamples, 2);
+	if (m_coeffSH) pCommandList->SetGraphicsRootShaderResourceView(3, m_coeffSH.get());
+
 	pCommandList->Draw(3, 1, 0, 0);
 }
 
@@ -1001,8 +979,7 @@ void Fluid::rayCastVDirect(CommandList* pCommandList, uint8_t frameIndex)
 	pCommandList->SetGraphicsDescriptorTable(0, m_cbvTables[frameIndex]);
 	//pCommandList->SetGraphicsRootConstantBufferView(0, m_cbPerObject.get(), m_cbPerObject->GetCBVOffset(frameIndex));
 	pCommandList->SetGraphicsDescriptorTable(1, m_srvUavTables[SRV_TABLE_RAY_MARCH + !m_frameParity]);
-	pCommandList->SetGraphicsDescriptorTable(2, m_samplerTables[SAMPLER_TABLE_CLAMP]);
-	pCommandList->SetGraphics32BitConstant(3, m_raySampleCount);
+	pCommandList->SetGraphics32BitConstant(2, m_raySampleCount);
 
 	pCommandList->Draw(3, 1, 0, 0);
 }
