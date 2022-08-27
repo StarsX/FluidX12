@@ -46,7 +46,7 @@ public:
 private:
 	static const uint8_t FrameCount = Fluid::FrameCount;
 
-	std::shared_ptr<XUSG::DescriptorTableCache> m_descriptorTableCache;
+	XUSG::DescriptorTableCache::sptr m_descriptorTableCache;
 
 	XUSG::SwapChain::uptr			m_swapChain;
 	XUSG::CommandAllocator::uptr	m_commandAllocators[FrameCount];
