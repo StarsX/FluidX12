@@ -115,11 +115,14 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	const float3 rayDir = normalize(target - rayOrigin);
 	if (!ComputeRayOrigin(rayOrigin, rayDir)) return;
 
+	float tMax = ComputeTargetHit(rayOrigin, target, rayDir);
+	const min16float stepScale = g_step;
+
 #ifdef _HAS_DEPTH_MAP_
 	// Calculate occluded end point
 	const float3 pos = GetClipPos(rayOrigin, rayDir);
 	g_rwCubeDepth[DTid] = pos.z;
-	const float tMax = GetTMax(pos, rayOrigin, rayDir);
+	tMax = GetTMax(pos, rayOrigin, rayDir, tMax);
 #endif
 
 	float3 shCoeffs[SH_NUM_COEFF];
@@ -141,15 +144,21 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	min16float3 scatter = 0.0;
 
 	float t = 0.0;
-	min16float step = g_stepScale;
+	min16float step = stepScale;
+	float prevDensity = 0.0;
 	for (uint i = 0; i < g_numSamples; ++i)
 	{
 		const float3 pos = rayOrigin + rayDir * t;
-		if (any(abs(pos) > 1.0)) break;
 		const float3 uvw = LocalToTex3DSpace(pos);
 
 		// Get a sample
+		//float mip = max(0.5 - transm, 0.0) * 2.0;
+		//const float mip1 = WaveReadLaneAt(mip, couple);
+		//mip = min(mip, mip1);
+		//min16float4 color = GetSample(uvw, mip);
 		min16float4 color = GetSample(uvw);
+		min16float newStep = stepScale;
+		float dDensity = 1.0;
 
 		// Skip empty space
 		if (color.w > ZERO_THRESHOLD)
@@ -159,33 +168,42 @@ void main(uint3 DTid : SV_DispatchThreadID)
 			const float3 lightDir = normalize(localSpaceLightPt - pos);
 #endif
 
-			// Sample light
-			const float3 light = GetLight(pos, lightDir, shCoeffs);
+			const float3 light = GetLight(pos, lightDir, shCoeffs); // Sample light
+
+			// Update step
+			dDensity = color.w - prevDensity;
+			const min16float opacity = saturate(color.w * step);
+			newStep = GetStep(dDensity, transm, opacity, stepScale);
+			step = (step + newStep) * 0.5;
+			prevDensity = color.w;
 
 			// Accumulate color
-			color.w = GetOpacity(color.w, step);
-			color.xyz *= transm;
+			const min16float tansl = GetTranslucency(color.w, step);
+			color.w = saturate(color.w * step);
 #ifdef _PRE_MULTIPLIED_
 			color.xyz = GetPremultiplied(color.xyz, step);
 #else
+			//color.xyz *= color.w;
 			color.xyz *= color.w;
 #endif
+			color.xyz *= transm;
 
 			//scatter += color.xyz;
-			scatter += min16float3(light) * color.xyz;
+			scatter += color.xyz * min16float3(light);
 
 			// Attenuate ray-throughput
-			transm *= 1.0 - color.w;
+			transm *= 1.0 - tansl;
 			if (transm < ZERO_THRESHOLD) break;
 		}
 
 		// Update position along ray
-		step = GetStep(transm, color.w, g_stepScale);
+		step = newStep;
 		t += step;
-#ifdef _HAS_DEPTH_MAP_
 		if (t > tMax) break;
-#endif
 	}
 
+	scatter.xyz /= 2.0 * PI;
+
+	//scatter = eyeIdx ? min16float3(0.5 * scatter.x, scatter.yz) : min16float3(scatter.x, 0.5 * scatter.yz);
 	g_rwCubeMap[DTid] = float4(scatter, 1.0 - transm);
 }

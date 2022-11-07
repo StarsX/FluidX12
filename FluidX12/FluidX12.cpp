@@ -33,7 +33,7 @@ const auto g_dsFormat = Format::D24_UNORM_S8_UINT;
 FluidX::FluidX(uint32_t width, uint32_t height, std::wstring name) :
 	DXFramework(width, height, name),
 	m_frameIndex(0),
-	m_maxRaySamples(256),
+	m_maxRaySamples(192),
 	m_maxLightSamples(64),
 	m_showFPS(true),
 	m_isPaused(false),
@@ -120,7 +120,7 @@ void FluidX::LoadPipeline()
 
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-	m_descriptorTableCache = DescriptorTableCache::MakeShared(m_device.get(), L"DescriptorTableCache");
+	m_descriptorTableLib = DescriptorTableLib::MakeShared(m_device.get(), L"DescriptorTableLib");
 
 	// Create frame resources.
 	// Create a RTV and a command allocator for each frame.
@@ -154,7 +154,7 @@ void FluidX::LoadAssets()
 	if (!m_radianceFile.empty())
 	{
 		XUSG_X_RETURN(m_lightProbe, make_unique<LightProbe>(), ThrowIfFailed(E_FAIL));
-		XUSG_N_RETURN(m_lightProbe->Init(pCommandList, m_descriptorTableCache, uploaders,
+		XUSG_N_RETURN(m_lightProbe->Init(pCommandList, m_descriptorTableLib, uploaders,
 			m_radianceFile.c_str(), g_rtFormat, g_dsFormat), ThrowIfFailed(E_FAIL));
 		XUSG_N_RETURN(m_lightProbe->CreateDescriptorTables(m_device.get()), ThrowIfFailed(E_FAIL));
 	}
@@ -162,7 +162,7 @@ void FluidX::LoadAssets()
 	// Create fast hybrid fluid simulator
 	m_fluid = make_unique<Fluid>();
 	if (!m_fluid) ThrowIfFailed(E_FAIL);
-	if (!m_fluid->Init(pCommandList, m_width, m_height, m_descriptorTableCache, uploaders,
+	if (!m_fluid->Init(pCommandList, m_width, m_height, m_descriptorTableLib, uploaders,
 		Format::B8G8R8A8_UNORM, Format::D24_UNORM_S8_UINT, m_gridSize))
 		ThrowIfFailed(E_FAIL);
 	m_fluid->SetMaxSamples(m_maxRaySamples, m_maxLightSamples);
@@ -388,7 +388,7 @@ void FluidX::PopulateCommandList()
 		}
 	}
 
-	const auto descriptorPool = m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL);
+	const auto descriptorPool = m_descriptorTableLib->GetDescriptorPool(CBV_SRV_UAV_POOL);
 	pCommandList->SetDescriptorPools(1, &descriptorPool);
 
 	// Fluid simulation

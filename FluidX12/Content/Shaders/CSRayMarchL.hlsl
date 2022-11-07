@@ -22,23 +22,24 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	rayOrigin.xyz = (DTid + 0.5) / gridSize * 2.0 - 1.0;
 	rayOrigin.w = 1.0;
 
-	rayOrigin.xyz = mul(rayOrigin, g_lightMapWorld);	// Light-map space to world space
+	//rayOrigin.xyz = mul(rayOrigin, g_world);	// Light-map space to world space
 
 	// Transmittance
 #ifdef _HAS_SHADOW_MAP_
-	min16float shadow = ShadowTest(rayOrigin.xyz, g_txDepth);
+	min16float shadow = ShadowTest(mul(rayOrigin, g_world), g_txDepth);
 #else
 	min16float shadow = 1.0;
 #endif
+
+	// Light-map space same to volume space (coupled)
+	//rayOrigin.xyz = mul(rayOrigin, g_worldI);	// World space to volume space
+	const float3 uvw = LocalToTex3DSpace(rayOrigin.xyz);
+	const min16float density = GetSample(uvw).w;
 
 #ifdef _HAS_LIGHT_PROBE_
 	min16float ao = 1.0;
 	float3 irradiance = 0.0;
 #endif
-
-	rayOrigin.xyz = mul(rayOrigin, g_worldI);			// World space to volume space
-	const float3 uvw = LocalToTex3DSpace(rayOrigin.xyz);
-	const min16float density = GetSample(uvw).w;
 
 	if (density >= ZERO_THRESHOLD)
 	{
@@ -51,27 +52,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 			const float3 localSpaceLightPt = mul(g_lightPt, (float3x3)g_worldI);
 			const float3 rayDir = normalize(localSpaceLightPt);
 #endif
-
-			float t = g_stepScale;
-			min16float step = g_stepScale;
-			for (uint i = 0; i < g_numSamples; ++i)
-			{
-				const float3 pos = rayOrigin.xyz + rayDir * t;
-				if (any(abs(pos) > 1.0)) break;
-				const float3 uvw = LocalToTex3DSpace(pos);
-
-				// Get a sample along light ray
-				const min16float density = GetSample(uvw).w;
-
-				// Attenuate ray-throughput along light direction
-				const min16float opacity = GetOpacity(density, step);
-				shadow *= 1.0 - opacity;
-				if (shadow < ZERO_THRESHOLD) break;
-
-				// Update position along light ray
-				step = GetStep(shadow, opacity, g_stepScale);
-				t += step;
-			}
+			CastLightRay(shadow, rayOrigin.xyz, rayDir, g_step, g_numSamples);
 		}
 
 #ifdef _HAS_LIGHT_PROBE_
@@ -81,29 +62,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
 			LoadSH(shCoeffs, g_roSHCoeffs);
 			float3 rayDir = -GetDensityGradient(uvw);
 			rayDir = any(abs(rayDir) > 0.0) ? rayDir : rayOrigin.xyz; // Avoid 0-gradient caused by uniform density field
+			irradiance = GetIrradiance(shCoeffs, normalize(mul(rayDir, (float3x3)g_world)));
 			rayDir = normalize(rayDir);
-			irradiance = GetIrradiance(shCoeffs, mul(rayDir, (float3x3)g_world));
-
-			float t = g_stepScale;
-			min16float step = g_stepScale;
-			for (uint i = 0; i < g_numSamples; ++i)
-			{
-				const float3 pos = rayOrigin.xyz + rayDir * t;
-				if (any(abs(pos) > 1.0)) break;
-				const float3 uvw = LocalToTex3DSpace(pos);
-
-				// Get a sample along light ray
-				const min16float density = GetSample(uvw).w;
-
-				// Attenuate ray-throughput along light direction
-				const min16float opacity = GetOpacity(density, step);
-				ao *= 1.0 - opacity;
-				if (ao < ZERO_THRESHOLD) break;
-
-				// Update position along light ray
-				step = GetStep(ao, opacity, g_stepScale);
-				t += step;
-			}
+			CastLightRay(ao, rayOrigin.xyz, rayDir, g_step, g_numSamples);
 		}
 #endif
 	}
@@ -112,9 +73,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	min16float3 ambient = min16float3(g_ambient.xyz * g_ambient.w);
 
 #ifdef _HAS_LIGHT_PROBE_
-	ambient = g_hasLightProbes ? min16float3(irradiance) * ao : ambient;
+	ambient = g_hasLightProbes ? ao * min16float3(irradiance) : ambient;
 #endif
 
-	g_rwLightMap[DTid] = lightColor * shadow + ambient;
-
+	g_rwLightMap[DTid] = shadow * lightColor + ambient;
 }

@@ -41,7 +41,7 @@ float UnprojectZ(float depth)
 min16float2 GetDomain(float2 uv, float3 pos, float3 rayDir, float2 gridSize)
 {
 	uv *= gridSize;
-	min16float2 domain = min16float2(frac(uv + 0.5));
+	float2 domain = frac(uv + 0.5);
 
 #if !_USE_PURE_ARRAY_
 	const float bound = gridSize.x - 1.0;
@@ -54,7 +54,7 @@ min16float2 GetDomain(float2 uv, float3 pos, float3 rayDir, float2 gridSize)
 	}
 #endif
 
-	return domain;
+	return min16float2(domain);
 }
 
 //--------------------------------------------------------------------------------------

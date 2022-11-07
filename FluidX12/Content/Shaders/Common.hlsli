@@ -8,7 +8,7 @@
 
 #define	INF				asfloat(0x7f800000)
 #define	FLT_MAX			3.402823466e+38
-#define DENSITY_SCALE	16.0
+#define DENSITY_SCALE	90.0
 
 //--------------------------------------------------------------------------------------
 // Constant buffers
@@ -19,13 +19,11 @@ cbuffer cbPerObject
 	float4x4 g_worldViewProj;
 	float4x3 g_worldI;
 	float4x3 g_world;
-	float4x3 g_localToLight;
 };
 
 cbuffer cbPerFrame
 {
 	float3 g_eyePt;
-	float4x3 g_lightMapWorld;
 	//float4x4 g_shadowViewProj;
 	float3 g_lightPt;
 	float4 g_lightColor;

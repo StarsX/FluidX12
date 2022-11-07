@@ -20,21 +20,21 @@ struct CBPerFrame
 
 LightProbe::LightProbe()
 {
-	m_shaderPool = ShaderPool::MakeShared();
+	m_shaderLib = ShaderLib::MakeShared();
 }
 
 LightProbe::~LightProbe()
 {
 }
 
-bool LightProbe::Init(CommandList* pCommandList, const DescriptorTableCache::sptr& descriptorTableCache,
+bool LightProbe::Init(CommandList* pCommandList, const DescriptorTableLib::sptr& descriptorTableLib,
 	vector<Resource::uptr>& uploaders, const wchar_t* fileName, Format rtFormat, Format dsFormat)
 {
 	const auto pDevice = pCommandList->GetDevice();
-	m_graphicsPipelineCache = Graphics::PipelineCache::MakeUnique(pDevice);
-	m_computePipelineCache = Compute::PipelineCache::MakeShared(pDevice);
-	m_pipelineLayoutCache = PipelineLayoutCache::MakeShared(pDevice);
-	m_descriptorTableCache = descriptorTableCache;
+	m_graphicsPipelineLib = Graphics::PipelineLib::MakeUnique(pDevice);
+	m_computePipelineLib = Compute::PipelineLib::MakeShared(pDevice);
+	m_pipelineLayoutLib = PipelineLayoutLib::MakeShared(pDevice);
+	m_descriptorTableLib = descriptorTableLib;
 
 	// Load input image
 	auto texWidth = 1u, texHeight = 1u;
@@ -64,8 +64,8 @@ bool LightProbe::Init(CommandList* pCommandList, const DescriptorTableCache::spt
 bool LightProbe::CreateDescriptorTables(Device* pDevice)
 {
 	m_sphericalHarmonics = SphericalHarmonics::MakeUnique();
-	XUSG_N_RETURN(m_sphericalHarmonics->Init(pDevice, m_shaderPool, m_computePipelineCache,
-		m_pipelineLayoutCache, m_descriptorTableCache, 0), false);
+	XUSG_N_RETURN(m_sphericalHarmonics->Init(pDevice, m_shaderLib, m_computePipelineLib,
+		m_pipelineLayoutLib, m_descriptorTableLib, 0), false);
 
 	return createDescriptorTables();
 }
@@ -111,14 +111,14 @@ bool LightProbe::createPipelineLayouts()
 {
 	// Environment mapping
 	{
-		const auto sampler = m_descriptorTableCache->GetSampler(SamplerPreset::LINEAR_WRAP);
+		const auto sampler = m_descriptorTableLib->GetSampler(SamplerPreset::LINEAR_WRAP);
 
 		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
 		pipelineLayout->SetRootCBV(0, 0, 0, Shader::Stage::PS);
 		pipelineLayout->SetRange(1, DescriptorType::SRV, 1, 0);
 		pipelineLayout->SetShaderStage(1, Shader::Stage::PS);
 		pipelineLayout->SetStaticSamplers(&sampler, 1, 0, 0, Shader::PS);
-		XUSG_X_RETURN(m_pipelineLayouts[ENVIRONMENT], pipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
+		XUSG_X_RETURN(m_pipelineLayouts[ENVIRONMENT], pipelineLayout->GetPipelineLayout(m_pipelineLayoutLib.get(),
 			PipelineLayoutFlag::NONE, L"EnvironmentLayout"), false);
 	}
 
@@ -129,18 +129,18 @@ bool LightProbe::createPipelines(Format rtFormat, Format dsFormat)
 {
 	// Environment mapping
 	{
-		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::VS, ENVIRONMENT, L"VSScreenQuad.cso"), false);
-		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::PS, ENVIRONMENT, L"PSEnvironment.cso"), false);
+		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::VS, ENVIRONMENT, L"VSScreenQuad.cso"), false);
+		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::PS, ENVIRONMENT, L"PSEnvironment.cso"), false);
 
 		const auto state = Graphics::State::MakeUnique();
 		state->SetPipelineLayout(m_pipelineLayouts[ENVIRONMENT]);
-		state->SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, ENVIRONMENT));
-		state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, ENVIRONMENT));
+		state->SetShader(Shader::Stage::VS, m_shaderLib->GetShader(Shader::Stage::VS, ENVIRONMENT));
+		state->SetShader(Shader::Stage::PS, m_shaderLib->GetShader(Shader::Stage::PS, ENVIRONMENT));
 		state->IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
-		state->DSSetState(Graphics::DEPTH_READ_LESS_EQUAL, m_graphicsPipelineCache.get());
+		state->DSSetState(Graphics::DEPTH_READ_LESS_EQUAL, m_graphicsPipelineLib.get());
 		state->OMSetRTVFormats(&rtFormat, 1);
 		state->OMSetDSVFormat(dsFormat);
-		XUSG_X_RETURN(m_pipelines[ENVIRONMENT], state->GetPipeline(m_graphicsPipelineCache.get(), L"Environment"), false);
+		XUSG_X_RETURN(m_pipelines[ENVIRONMENT], state->GetPipeline(m_graphicsPipelineLib.get(), L"Environment"), false);
 	}
 
 	return true;
@@ -152,7 +152,7 @@ bool LightProbe::createDescriptorTables()
 	{
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0, 1, &m_radiance->GetSRV());
-		XUSG_X_RETURN(m_srvTable, descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+		XUSG_X_RETURN(m_srvTable, descriptorTable->GetCbvSrvUavTable(m_descriptorTableLib.get()), false);
 	}
 
 	return true;
