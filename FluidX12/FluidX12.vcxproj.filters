@@ -34,7 +34,10 @@
     <Filter Include="Shaders\Rendering">
       <UniqueIdentifier>{d5948538-5a6c-4355-be97-873963b1f36a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders\Rendering\SHMath">
+    <Filter Include="XUSG\Shaders">
+      <UniqueIdentifier>{d93c3c8e-350a-4443-af61-282185502566}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="XUSG\Shaders\SHMath">
       <UniqueIdentifier>{48436bf4-1f06-42d1-8a0a-e5ebb2a18402}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -76,9 +79,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="XUSG\Advanced\XUSGDDSLoader.h">
-      <Filter>XUSG</Filter>
-    </ClInclude>
-    <ClInclude Include="XUSG\Advanced\XUSGSHSharedConsts.h">
       <Filter>XUSG</Filter>
     </ClInclude>
     <ClInclude Include="XUSG\Advanced\XUSGSphericalHarmonics.h">
@@ -136,14 +136,11 @@
     <None Include="Content\Shaders\PSCube.hlsli">
       <Filter>Shaders\Rendering</Filter>
     </None>
-    <None Include="XUSG\Shaders\CubeMap.hlsli">
-      <Filter>Shaders\Rendering\SHMath</Filter>
-    </None>
     <None Include="XUSG\Shaders\SHIrradiance.hlsli">
-      <Filter>Shaders\Rendering\SHMath</Filter>
+      <Filter>XUSG\Shaders\SHMath</Filter>
     </None>
     <None Include="XUSG\Shaders\SHIrradianceTypeless.hlsli">
-      <Filter>Shaders\Rendering\SHMath</Filter>
+      <Filter>XUSG\Shaders\SHMath</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

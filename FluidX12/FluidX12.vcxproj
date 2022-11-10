@@ -183,7 +183,6 @@ COPY /Y "$(ProjectDir)XUSG\Bin\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir
     <ClInclude Include="FluidX12.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="XUSG\Advanced\XUSGDDSLoader.h" />
-    <ClInclude Include="XUSG\Advanced\XUSGSHSharedConsts.h" />
     <ClInclude Include="XUSG\Advanced\XUSGSphericalHarmonics.h" />
     <ClInclude Include="XUSG\Core\XUSG.h" />
   </ItemGroup>
@@ -242,7 +241,6 @@ COPY /Y "$(ProjectDir)XUSG\Bin\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir
     <None Include="Content\Shaders\Common.hlsli" />
     <None Include="Content\Shaders\RayMarch.hlsli" />
     <None Include="Content\Shaders\Simulation.hlsli" />
-    <None Include="XUSG\Shaders\CubeMap.hlsli" />
     <None Include="XUSG\Shaders\SHIrradiance.hlsli" />
     <None Include="XUSG\Shaders\SHIrradianceTypeless.hlsli" />
   </ItemGroup>
