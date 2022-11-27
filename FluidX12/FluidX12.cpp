@@ -377,6 +377,9 @@ void FluidX::PopulateCommandList()
 	XUSG_N_RETURN(pCommandList->Reset(pCommandAllocator, nullptr), ThrowIfFailed(E_FAIL));
 
 	// Record commands.
+	const auto descriptorHeap = m_descriptorTableLib->GetDescriptorHeap(CBV_SRV_UAV_HEAP);
+	pCommandList->SetDescriptorHeaps(1, &descriptorHeap);
+
 	if (m_lightProbe)
 	{
 		static auto isFirstFrame = true;
@@ -387,9 +390,6 @@ void FluidX::PopulateCommandList()
 			isFirstFrame = false;
 		}
 	}
-
-	const auto descriptorPool = m_descriptorTableLib->GetDescriptorPool(CBV_SRV_UAV_POOL);
-	pCommandList->SetDescriptorPools(1, &descriptorPool);
 
 	// Fluid simulation
 	m_fluid->Simulate(pCommandList, m_frameIndex);
