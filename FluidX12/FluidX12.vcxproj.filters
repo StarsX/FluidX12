@@ -96,6 +96,15 @@
     <ClInclude Include="XUSG\Helper\XUSG-EZ.h">
       <Filter>XUSG</Filter>
     </ClInclude>
+    <ClInclude Include="Content\FluidEZ.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="XUSG\Advanced\XUSGSHSharedConsts.h">
+      <Filter>XUSG</Filter>
+    </ClInclude>
+    <ClInclude Include="Content\LightProbeEZ.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Common\DXFramework.cpp">
@@ -117,6 +126,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Content\LightProbe.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Content\FluidEZ.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Content\LightProbeEZ.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -143,6 +158,18 @@
       <Filter>XUSG\Shaders\SHMath</Filter>
     </None>
     <None Include="XUSG\Shaders\SHIrradianceTypeless.hlsli">
+      <Filter>XUSG\Shaders\SHMath</Filter>
+    </None>
+    <None Include="XUSG\Shaders\CSWaveOp.hlsli">
+      <Filter>XUSG\Shaders\SHMath</Filter>
+    </None>
+    <None Include="XUSG\Shaders\CubeMap.hlsli">
+      <Filter>XUSG\Shaders\SHMath</Filter>
+    </None>
+    <None Include="XUSG\Shaders\SHMath.hlsli">
+      <Filter>XUSG\Shaders\SHMath</Filter>
+    </None>
+    <None Include="XUSG\Shaders\WaveOpTypeless.hlsli">
       <Filter>XUSG\Shaders\SHMath</Filter>
     </None>
   </ItemGroup>
@@ -188,6 +215,15 @@
     </FxCompile>
     <FxCompile Include="Content\Shaders\PSCube.hlsl">
       <Filter>Shaders\Rendering</Filter>
+    </FxCompile>
+    <FxCompile Include="XUSG\Shaders\CSSHCubeMap.hlsl">
+      <Filter>XUSG\Shaders\SHMath</Filter>
+    </FxCompile>
+    <FxCompile Include="XUSG\Shaders\CSSHNormalize.hlsl">
+      <Filter>XUSG\Shaders\SHMath</Filter>
+    </FxCompile>
+    <FxCompile Include="XUSG\Shaders\CSSHSum.hlsl">
+      <Filter>XUSG\Shaders\SHMath</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>

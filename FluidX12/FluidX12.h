@@ -15,6 +15,8 @@
 #include "StepTimer.h"
 #include "Fluid.h"
 #include "LightProbe.h"
+#include "FluidEZ.h"
+#include "LightProbeEZ.h"
 
 using namespace DirectX;
 
@@ -56,11 +58,14 @@ private:
 	XUSG::Device::uptr			m_device;
 	XUSG::RenderTarget::uptr	m_renderTargets[FrameCount];
 	XUSG::CommandList::uptr		m_commandList;
+	XUSG::EZ::CommandList::uptr	m_commandListEZ;
 
 	// App resources.
-	std::unique_ptr<LightProbe>	m_lightProbe;
-	std::unique_ptr<Fluid>		m_fluid;
-	XUSG::DepthStencil::uptr	m_depth;
+	std::unique_ptr<LightProbe>		m_lightProbe;
+	std::unique_ptr<LightProbeEZ>	m_lightProbeEZ;
+	std::unique_ptr<Fluid>			m_fluid;
+	std::unique_ptr<FluidEZ>		m_fluidEZ;
+	XUSG::DepthStencil::uptr		m_depth;
 	XMFLOAT4X4	m_proj;
 	XMFLOAT4X4	m_view;
 	XMFLOAT3	m_focusPt;
@@ -75,6 +80,7 @@ private:
 	// Application state
 	uint32_t	m_maxRaySamples;
 	uint32_t	m_maxLightSamples;
+	bool		m_useEZ;
 	bool		m_showFPS;
 	bool		m_isPaused;
 	StepTimer	m_timer;

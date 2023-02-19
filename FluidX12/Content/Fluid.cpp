@@ -4,9 +4,6 @@
 
 #include "SharedConsts.h"
 #include "Fluid.h"
-#define _INDEPENDENT_DDS_LOADER_
-#include "Advanced/XUSGDDSLoader.h"
-#undef _INDEPENDENT_DDS_LOADER_
 
 using namespace std;
 using namespace DirectX;
@@ -765,7 +762,7 @@ bool Fluid::createDescriptorTables()
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		const Descriptor descriptors[] =
 		{
-			m_colors[(i + 1) % 2]->GetSRV(),
+			m_colors[!i]->GetSRV(),
 			m_lightMap->GetSRV()
 		};
 		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
@@ -801,7 +798,7 @@ bool Fluid::createDescriptorTables()
 		XUSG_X_RETURN(m_srvMipTables[i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableLib.get()), false);
 	}
 
-	// Create URV table
+	// Create UAV table
 	{
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0,1, &m_lightMap->GetUAV());
@@ -922,8 +919,6 @@ void Fluid::renderCube(CommandList* pCommandList, uint8_t frameIndex)
 	// Set pipeline state
 	pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[RENDER_CUBE]);
 	pCommandList->SetPipelineState(m_pipelines[RENDER_CUBE]);
-
-	pCommandList->IASetPrimitiveTopology(PrimitiveTopology::TRIANGLESTRIP);
 
 	// Set descriptor tables
 	pCommandList->SetGraphicsDescriptorTable(0, m_cbvTables[frameIndex]);

@@ -35,6 +35,7 @@ FluidX::FluidX(uint32_t width, uint32_t height, std::wstring name) :
 	m_frameIndex(0),
 	m_maxRaySamples(192),
 	m_maxLightSamples(64),
+	m_useEZ(true),
 	m_showFPS(true),
 	m_isPaused(false),
 	m_tracking(false),
@@ -149,23 +150,43 @@ void FluidX::LoadAssets()
 	XUSG_N_RETURN(pCommandList->Create(m_device.get(), 0, CommandListType::DIRECT,
 		m_commandAllocators[m_frameIndex].get(), nullptr), ThrowIfFailed(E_FAIL));
 
-	vector<Resource::uptr> uploaders(0);
+	m_commandListEZ = EZ::CommandList::MakeUnique();
+	XUSG_N_RETURN(m_commandListEZ->Create(pCommandList, 3, 80),
+		ThrowIfFailed(E_FAIL));
 
-	if (!m_radianceFile.empty())
+	vector<Resource::uptr> uploaders(0);
 	{
-		XUSG_X_RETURN(m_lightProbe, make_unique<LightProbe>(), ThrowIfFailed(E_FAIL));
-		XUSG_N_RETURN(m_lightProbe->Init(pCommandList, m_descriptorTableLib, uploaders,
-			m_radianceFile.c_str(), g_rtFormat, g_dsFormat), ThrowIfFailed(E_FAIL));
-		XUSG_N_RETURN(m_lightProbe->CreateDescriptorTables(m_device.get()), ThrowIfFailed(E_FAIL));
+		if (!m_radianceFile.empty())
+		{
+			XUSG_X_RETURN(m_lightProbe, make_unique<LightProbe>(), ThrowIfFailed(E_FAIL));
+			XUSG_N_RETURN(m_lightProbe->Init(pCommandList, m_descriptorTableLib, uploaders,
+				m_radianceFile.c_str(), g_rtFormat, g_dsFormat), ThrowIfFailed(E_FAIL));
+			XUSG_N_RETURN(m_lightProbe->CreateDescriptorTables(m_device.get()), ThrowIfFailed(E_FAIL));
+		}
+
+		// Create fast hybrid fluid simulator
+		m_fluid = make_unique<Fluid>();
+		if (!m_fluid->Init(pCommandList, m_width, m_height, m_descriptorTableLib, uploaders,
+			Format::B8G8R8A8_UNORM, Format::D24_UNORM_S8_UINT, m_gridSize))
+			ThrowIfFailed(E_FAIL);
+		m_fluid->SetMaxSamples(m_maxRaySamples, m_maxLightSamples);
 	}
 
-	// Create fast hybrid fluid simulator
-	m_fluid = make_unique<Fluid>();
-	if (!m_fluid) ThrowIfFailed(E_FAIL);
-	if (!m_fluid->Init(pCommandList, m_width, m_height, m_descriptorTableLib, uploaders,
-		Format::B8G8R8A8_UNORM, Format::D24_UNORM_S8_UINT, m_gridSize))
-		ThrowIfFailed(E_FAIL);
-	m_fluid->SetMaxSamples(m_maxRaySamples, m_maxLightSamples);
+	// EZ
+	{
+		if (!m_radianceFile.empty())
+		{
+			XUSG_X_RETURN(m_lightProbeEZ, make_unique<LightProbeEZ>(), ThrowIfFailed(E_FAIL));
+			XUSG_N_RETURN(m_lightProbeEZ->Init(pCommandList, uploaders, m_radianceFile.c_str()), ThrowIfFailed(E_FAIL));
+		}
+
+		// Create fast hybrid fluid simulator
+		XUSG_X_RETURN(m_fluidEZ, make_unique<FluidEZ>(), ThrowIfFailed(E_FAIL));
+		XUSG_N_RETURN(m_fluidEZ->Init(pCommandList, m_width, m_height, uploaders,
+			Format::B8G8R8A8_UNORM, Format::D24_UNORM_S8_UINT, m_gridSize),
+			ThrowIfFailed(E_FAIL));
+		m_fluidEZ->SetMaxSamples(m_maxRaySamples, m_maxLightSamples);
+	}
 
 	// Close the command list and execute it to begin the initial GPU setup.
 	XUSG_N_RETURN(pCommandList->Close(), ThrowIfFailed(E_FAIL));
@@ -221,8 +242,16 @@ void FluidX::OnUpdate()
 	const auto view = XMLoadFloat4x4(&m_view);
 	const auto proj = XMLoadFloat4x4(&m_proj);
 	const auto viewProj = view * proj;
-	if (m_lightProbe) m_lightProbe->UpdateFrame(m_frameIndex, viewProj, m_eyePt);
-	m_fluid->UpdateFrame(timeStep, m_frameIndex, m_view, m_proj, m_eyePt);
+	if (m_useEZ)
+	{
+		if (m_lightProbeEZ) m_lightProbeEZ->UpdateFrame(m_frameIndex, viewProj, m_eyePt);
+		m_fluidEZ->UpdateFrame(timeStep, m_frameIndex, m_view, m_proj, m_eyePt);
+	}
+	else
+	{
+		if (m_lightProbe) m_lightProbe->UpdateFrame(m_frameIndex, viewProj, m_eyePt);
+		m_fluid->UpdateFrame(timeStep, m_frameIndex, m_view, m_proj, m_eyePt);
+	}
 }
 
 // Render the scene.
@@ -265,6 +294,9 @@ void FluidX::OnKeyUp(uint8_t key)
 		break;
 	case VK_RIGHT:
 		g_renderMethod = static_cast<RenderMethod>((g_renderMethod + 1) % NUM_RENDER_METHOD);
+		break;
+	case 'X':
+		m_useEZ = !m_useEZ;
 		break;
 	}
 }
@@ -370,71 +402,135 @@ void FluidX::PopulateCommandList()
 	const auto pCommandAllocator = m_commandAllocators[m_frameIndex].get();
 	XUSG_N_RETURN(pCommandAllocator->Reset(), ThrowIfFailed(E_FAIL));
 
-	// However, when ExecuteCommandList() is called on a particular command 
-	// list, that command list can then be reset at any time and must be before 
-	// re-recording.
-	const auto pCommandList = m_commandList.get();
-	XUSG_N_RETURN(pCommandList->Reset(pCommandAllocator, nullptr), ThrowIfFailed(E_FAIL));
-
-	// Record commands.
-	const auto descriptorHeap = m_descriptorTableLib->GetDescriptorHeap(CBV_SRV_UAV_HEAP);
-	pCommandList->SetDescriptorHeaps(1, &descriptorHeap);
-
-	if (m_lightProbe)
+	const auto renderTarget = m_renderTargets[m_frameIndex].get();
+	if (m_useEZ)
 	{
-		static auto isFirstFrame = true;
-		if (isFirstFrame)
+		// However, when ExecuteCommandList() is called on a particular command 
+		// list, that command list can then be reset at any time and must be before 
+		// re-recording.
+		const auto pCommandList = m_commandListEZ.get();
+		XUSG_N_RETURN(pCommandList->Reset(pCommandAllocator, nullptr), ThrowIfFailed(E_FAIL));
+
+		// Record commands.
+		if (m_lightProbeEZ)
 		{
-			m_lightProbe->TransformSH(pCommandList);
-			m_fluid->SetSH(m_lightProbe->GetSH());
-			isFirstFrame = false;
+			static auto isFirstFrame = true;
+			if (isFirstFrame)
+			{
+				m_lightProbeEZ->TransformSH(pCommandList);
+				m_fluidEZ->SetSH(m_lightProbeEZ->GetSH());
+				isFirstFrame = false;
+			}
 		}
+
+		// Fluid simulation
+		m_fluidEZ->Simulate(pCommandList, m_frameIndex);
+
+		// Clear render target
+		const auto rtv = EZ::GetRTV(renderTarget);
+		const auto dsv = EZ::GetDSV(m_depth.get());
+
+		const float clearColor[4] = { 0.2f, 0.2f, 0.2f, 0.0f };
+		pCommandList->ClearRenderTargetView(rtv, clearColor);
+		pCommandList->ClearDepthStencilView(dsv, ClearFlag::DEPTH, 1.0f);
+
+		pCommandList->OMSetRenderTargets(1, &rtv, &dsv);
+
+		// Set viewport
+		Viewport viewport(0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height));
+		RectRange scissorRect(0, 0, m_width, m_height);
+		pCommandList->RSSetViewports(1, &viewport);
+		pCommandList->RSSetScissorRects(1, &scissorRect);
+
+		if (m_lightProbeEZ) m_lightProbeEZ->RenderEnvironment(pCommandList, m_frameIndex);
+		switch (g_renderMethod)
+		{
+		case RAY_MARCH_MERGED:
+			m_fluidEZ->Render(pCommandList, m_frameIndex, Fluid::RAY_MARCH_CUBEMAP);
+			break;
+		case RAY_MARCH_SEPARATE:
+			m_fluidEZ->Render(pCommandList, m_frameIndex, Fluid::OPTIMIZED);
+			break;
+		case RAY_MARCH_DIRECT_MERGED:
+			m_fluidEZ->Render(pCommandList, m_frameIndex, Fluid::RAY_MARCH_DIRECT);
+			break;
+		case RAY_MARCH_DIRECT_SEPARATE:
+			m_fluidEZ->Render(pCommandList, m_frameIndex, Fluid::SEPARATE_LIGHT_PASS);
+			break;
+		default:
+			m_fluidEZ->Render(pCommandList, m_frameIndex, Fluid::RAY_MARCH_DIRECT);
+		}
+
+		XUSG_N_RETURN(pCommandList->Close(renderTarget), ThrowIfFailed(E_FAIL));
 	}
-
-	// Fluid simulation
-	m_fluid->Simulate(pCommandList, m_frameIndex);
-
-	ResourceBarrier barriers[1];
-	auto numBarriers = m_renderTargets[m_frameIndex]->SetBarrier(barriers, ResourceState::RENDER_TARGET);
-	pCommandList->Barrier(numBarriers, barriers);
-
-	// Clear render target
-	const float clearColor[4] = { 0.2f, 0.2f, 0.2f, 0.0f };
-	pCommandList->ClearRenderTargetView(m_renderTargets[m_frameIndex]->GetRTV(), clearColor);
-	pCommandList->ClearDepthStencilView(m_depth->GetDSV(), ClearFlag::DEPTH, 1.0f);
-
-	pCommandList->OMSetRenderTargets(1, &m_renderTargets[m_frameIndex]->GetRTV(), &m_depth->GetDSV());
-
-	// Set viewport
-	Viewport viewport(0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height));
-	RectRange scissorRect(0, 0, m_width, m_height);
-	pCommandList->RSSetViewports(1, &viewport);
-	pCommandList->RSSetScissorRects(1, &scissorRect);
-
-	if (m_lightProbe) m_lightProbe->RenderEnvironment(pCommandList, m_frameIndex);
-	switch (g_renderMethod)
+	else 
 	{
-	case RAY_MARCH_MERGED:
-		m_fluid->Render(pCommandList, m_frameIndex, Fluid::RAY_MARCH_CUBEMAP);
-		break;
-	case RAY_MARCH_SEPARATE:
-		m_fluid->Render(pCommandList, m_frameIndex, Fluid::OPTIMIZED);
-		break;
-	case RAY_MARCH_DIRECT_MERGED:
-		m_fluid->Render(pCommandList, m_frameIndex, Fluid::RAY_MARCH_DIRECT);
-		break;
-	case RAY_MARCH_DIRECT_SEPARATE:
-		m_fluid->Render(pCommandList, m_frameIndex, Fluid::SEPARATE_LIGHT_PASS);
-		break;
-	default:
-		m_fluid->Render(pCommandList, m_frameIndex, Fluid::RAY_MARCH_DIRECT);
+		// However, when ExecuteCommandList() is called on a particular command 
+		// list, that command list can then be reset at any time and must be before 
+		// re-recording.
+		const auto pCommandList = m_commandList.get();
+		XUSG_N_RETURN(pCommandList->Reset(pCommandAllocator, nullptr), ThrowIfFailed(E_FAIL));
+
+		// Record commands.
+		const auto descriptorHeap = m_descriptorTableLib->GetDescriptorHeap(CBV_SRV_UAV_HEAP);
+		pCommandList->SetDescriptorHeaps(1, &descriptorHeap);
+
+		if (m_lightProbe)
+		{
+			static auto isFirstFrame = true;
+			if (isFirstFrame)
+			{
+				m_lightProbe->TransformSH(pCommandList);
+				m_fluid->SetSH(m_lightProbe->GetSH());
+				isFirstFrame = false;
+			}
+		}
+
+		// Fluid simulation
+		m_fluid->Simulate(pCommandList, m_frameIndex);
+
+		ResourceBarrier barriers[1];
+		auto numBarriers = renderTarget->SetBarrier(barriers, ResourceState::RENDER_TARGET);
+		pCommandList->Barrier(numBarriers, barriers);
+
+		// Clear render target
+		const float clearColor[4] = { 0.2f, 0.2f, 0.2f, 0.0f };
+		pCommandList->ClearRenderTargetView(renderTarget->GetRTV(), clearColor);
+		pCommandList->ClearDepthStencilView(m_depth->GetDSV(), ClearFlag::DEPTH, 1.0f);
+
+		pCommandList->OMSetRenderTargets(1, &renderTarget->GetRTV(), &m_depth->GetDSV());
+
+		// Set viewport
+		Viewport viewport(0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height));
+		RectRange scissorRect(0, 0, m_width, m_height);
+		pCommandList->RSSetViewports(1, &viewport);
+		pCommandList->RSSetScissorRects(1, &scissorRect);
+
+		if (m_lightProbe) m_lightProbe->RenderEnvironment(pCommandList, m_frameIndex);
+		switch (g_renderMethod)
+		{
+		case RAY_MARCH_MERGED:
+			m_fluid->Render(pCommandList, m_frameIndex, Fluid::RAY_MARCH_CUBEMAP);
+			break;
+		case RAY_MARCH_SEPARATE:
+			m_fluid->Render(pCommandList, m_frameIndex, Fluid::OPTIMIZED);
+			break;
+		case RAY_MARCH_DIRECT_MERGED:
+			m_fluid->Render(pCommandList, m_frameIndex, Fluid::RAY_MARCH_DIRECT);
+			break;
+		case RAY_MARCH_DIRECT_SEPARATE:
+			m_fluid->Render(pCommandList, m_frameIndex, Fluid::SEPARATE_LIGHT_PASS);
+			break;
+		default:
+			m_fluid->Render(pCommandList, m_frameIndex, Fluid::RAY_MARCH_DIRECT);
+		}
+
+		// Indicate that the back buffer will now be used to present.
+		numBarriers = renderTarget->SetBarrier(barriers, ResourceState::PRESENT);
+		pCommandList->Barrier(numBarriers, barriers);
+
+		XUSG_N_RETURN(pCommandList->Close(), ThrowIfFailed(E_FAIL));
 	}
-
-	// Indicate that the back buffer will now be used to present.
-	numBarriers = m_renderTargets[m_frameIndex]->SetBarrier(barriers, ResourceState::PRESENT);
-	pCommandList->Barrier(numBarriers, barriers);
-
-	XUSG_N_RETURN(pCommandList->Close(), ThrowIfFailed(E_FAIL));
 }
 
 // Wait for pending GPU work to complete.
@@ -494,7 +590,6 @@ double FluidX::CalculateFrameStats(float* pTimeStep)
 		windowText << L"    fps: ";
 		if (m_showFPS) windowText << setprecision(2) << fixed << fps;
 		else windowText << L"[F1]";
-		windowText << "  ";
 		windowText << L"    [\x2190][\x2192] ";
 		switch (g_renderMethod)
 		{
@@ -513,6 +608,7 @@ double FluidX::CalculateFrameStats(float* pTimeStep)
 		default:
 			windowText << L"Simple particle rendering";
 		}
+		windowText << L"    [X] " << (m_useEZ ? "XUSG-EZ" : "XUSGCore");
 
 		SetCustomWindowText(windowText.str().c_str());
 	}
