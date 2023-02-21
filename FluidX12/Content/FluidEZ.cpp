@@ -232,8 +232,12 @@ bool FluidEZ::Init(XUSG::CommandList* pCommandList, uint32_t width, uint32_t hei
 		ResourceFlag::ALLOW_UNORDERED_ACCESS, numMips, 1, true, MemoryFlag::NONE, L"CubeMapEZ"), false);
 
 	//m_cubeDepth = Texture2D::MakeUnique();
-	//XUSG_N_RETURN(m_cubeDepth->Create(m_device.get(), gridSize.x, gridSize.y,  Format::R32_FLOAT, 6,
-		//ResourceFlag::ALLOW_UNORDERED_ACCESS, numMips, 1, MemoryFlag::NONE, true, L"CubeDepthEZ"), false);
+	//XUSG_N_RETURN(m_cubeDepth->Create(pDevice, gridSize.x, gridSize.y,  Format::R32_FLOAT, 6,
+	//	ResourceFlag::ALLOW_UNORDERED_ACCESS, numMips, 1, true, MemoryFlag::NONE, L"CubeDepthEZ"), false);
+
+	m_nullBuffer = Buffer::MakeUnique();
+	XUSG_N_RETURN(m_nullBuffer->Create(pDevice, 0, ResourceFlag::ALLOW_UNORDERED_ACCESS,
+		MemoryType::DEFAULT, 1, nullptr, 1, nullptr, MemoryFlag::NONE, L"NullBuffer"), false);
 
 	// Create constant buffers
 	m_cbSimulation = ConstantBuffer::MakeUnique();
@@ -615,7 +619,7 @@ void FluidEZ::rayMarchL(EZ::CommandList* pCommandList, uint8_t frameIndex)
 		const EZ::ResourceView srvs[] =
 		{
 			EZ::GetSRV(m_colors[m_frameParity].get()),
-			EZ::GetSRV(m_colors[!m_frameParity].get()) // Workaround for Tier 2 GPUs
+			EZ::GetSRV(m_nullBuffer.get()) // Workaround for Tier 2 GPUs
 		};
 		pCommandList->SetResources(Shader::Stage::CS, DescriptorType::SRV, 0, static_cast<uint32_t>(size(srvs)), srvs);
 	}

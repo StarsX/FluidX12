@@ -90,6 +90,7 @@ protected:
 #endif
 
 	XUSG::StructuredBuffer::sptr m_coeffSH;
+	XUSG::Buffer::uptr		m_nullBuffer;
 
 	DirectX::XMFLOAT3		m_lightPt;
 	DirectX::XMFLOAT4		m_lightColor;

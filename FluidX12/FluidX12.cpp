@@ -369,27 +369,27 @@ void FluidX::ParseCommandLineArgs(wchar_t* argv[], int argc)
 
 	for (auto i = 1; i < argc; ++i)
 	{
-		if (_wcsnicmp(argv[i], L"-gridSize", wcslen(argv[i])) == 0 ||
-			_wcsnicmp(argv[i], L"/gridSize", wcslen(argv[i])) == 0)
+		if (wcsncmp(argv[i], L"-gridSize", wcslen(argv[i])) == 0 ||
+			wcsncmp(argv[i], L"/gridSize", wcslen(argv[i])) == 0)
 		{
-			m_gridSize.x = ++i < argc ? static_cast<uint32_t>(_wtof(argv[i])) : m_gridSize.x;
-			m_gridSize.y = ++i < argc ? static_cast<uint32_t>(_wtof(argv[i])) : m_gridSize.y;
-			m_gridSize.z = ++i < argc ? static_cast<uint32_t>(_wtof(argv[i])) : m_gridSize.z;
+			if (i + 1 < argc) m_gridSize.x = stoul(argv[++i]);
+			if (i + 1 < argc) m_gridSize.y = stoul(argv[++i]);
+			if (i + 1 < argc) m_gridSize.z = stoul(argv[++i]);
 		}
-		else if (_wcsnicmp(argv[i], L"-maxRaySamples", wcslen(argv[i])) == 0 ||
-			_wcsnicmp(argv[i], L"/maxRaySamples", wcslen(argv[i])) == 0)
+		else if (wcsncmp(argv[i], L"-maxRaySamples", wcslen(argv[i])) == 0 ||
+			wcsncmp(argv[i], L"/maxRaySamples", wcslen(argv[i])) == 0)
 		{
-			m_maxRaySamples = ++i < argc ? _wtoi(argv[i]) : m_maxRaySamples;
+			if (i + 1 < argc) m_maxRaySamples = stoul(argv[++i]);
 		}
-		else if (_wcsnicmp(argv[i], L"-maxLightSamples", wcslen(argv[i])) == 0 ||
-			_wcsnicmp(argv[i], L"/maxLightSamples", wcslen(argv[i])) == 0)
+		else if (wcsncmp(argv[i], L"-maxLightSamples", wcslen(argv[i])) == 0 ||
+			wcsncmp(argv[i], L"/maxLightSamples", wcslen(argv[i])) == 0)
 		{
-			m_maxLightSamples = ++i < argc ? _wtoi(argv[i]) : m_maxLightSamples;
+			if (i + 1 < argc) m_maxLightSamples = stoul(argv[++i]);
 		}
-		else if (_wcsnicmp(argv[i], L"-radiance", wcslen(argv[i])) == 0 ||
-			_wcsnicmp(argv[i], L"/radiance", wcslen(argv[i])) == 0)
+		else if (wcsncmp(argv[i], L"-radiance", wcslen(argv[i])) == 0 ||
+			wcsncmp(argv[i], L"/radiance", wcslen(argv[i])) == 0)
 		{
-			m_radianceFile = i + 1 < argc ? argv[++i] : m_radianceFile;
+			if (i + 1 < argc) m_radianceFile = argv[++i];
 		}
 	}
 }

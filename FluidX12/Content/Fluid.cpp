@@ -232,8 +232,8 @@ bool Fluid::Init(CommandList* pCommandList, uint32_t width, uint32_t height,
 		ResourceFlag::ALLOW_UNORDERED_ACCESS, numMips, 1, true, MemoryFlag::NONE, L"CubeMap"), false);
 
 	//m_cubeDepth = Texture2D::MakeUnique();
-	//XUSG_N_RETURN(m_cubeDepth->Create(m_device.get(), gridSize.x, gridSize.y,  Format::R32_FLOAT, 6,
-		//ResourceFlag::ALLOW_UNORDERED_ACCESS, numMips, 1, MemoryFlag::NONE, true, L"CubeDepth"), false);
+	//XUSG_N_RETURN(m_cubeDepth->Create(pDevice, gridSize.x, gridSize.y,  Format::R32_FLOAT, 6,
+	//	ResourceFlag::ALLOW_UNORDERED_ACCESS, numMips, 1, true, MemoryFlag::NONE, L"CubeDepth"), false);
 
 	// Create constant buffers
 	m_cbSimulation = ConstantBuffer::MakeUnique();
