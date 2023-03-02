@@ -2,13 +2,12 @@
 // Copyright (c) XU, Tianchen & ZENG, Wei. All rights reserved.
 //--------------------------------------------------------------------------------------
 
-#define _TEXCOORD_INVERT_Y_
 #define _PRE_MULTIPLIED_
 #define _HAS_LIGHT_PROBE_
 
 #define	INF				asfloat(0x7f800000)
 #define	FLT_MAX			3.402823466e+38
-#define DENSITY_SCALE	90.0
+#define DENSITY_SCALE	6.0
 
 //--------------------------------------------------------------------------------------
 // Constant buffers
