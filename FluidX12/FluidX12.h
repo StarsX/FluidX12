@@ -77,6 +77,10 @@ private:
 	XUSG::Fence::uptr m_fence;
 	uint64_t	m_fenceValues[FrameCount];
 
+	// Screen-shot helper
+	XUSG::Buffer::uptr m_readBuffer;
+	uint32_t m_rowPitch;
+
 	// Application state
 	uint32_t	m_maxRaySamples;
 	uint32_t	m_maxLightSamples;
@@ -94,11 +98,15 @@ private:
 
 	std::wstring m_radianceFile;
 
+	// Screen-shot state
+	uint8_t m_screenShot;
+
 	void LoadPipeline();
 	void LoadAssets();
 
 	void PopulateCommandList();
 	void WaitForGpu();
 	void MoveToNextFrame();
+	void SaveImage(char const* fileName, XUSG::Buffer* imageBuffer, uint32_t w, uint32_t h, uint32_t rowPitch, uint8_t comp = 3);
 	double CalculateFrameStats(float* fTimeStep = nullptr);
 };
