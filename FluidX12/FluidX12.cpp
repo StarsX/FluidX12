@@ -41,7 +41,8 @@ FluidX::FluidX(uint32_t width, uint32_t height, std::wstring name) :
 	m_isPaused(false),
 	m_tracking(false),
 	m_gridSize(128, 128, 128),
-	m_radianceFile(L"")
+	m_radianceFile(L""),
+	m_screenShot(0)
 {
 #if defined (_DEBUG)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
