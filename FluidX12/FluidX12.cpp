@@ -34,6 +34,7 @@ const auto g_dsFormat = Format::D24_UNORM_S8_UINT;
 FluidX::FluidX(uint32_t width, uint32_t height, std::wstring name) :
 	DXFramework(width, height, name),
 	m_frameIndex(0),
+	m_deviceType(DEVICE_DISCRETE),
 	m_maxRaySamples(192),
 	m_maxLightSamples(64),
 	m_useEZ(true),
@@ -93,19 +94,45 @@ void FluidX::LoadPipeline()
 
 	DXGI_ADAPTER_DESC1 dxgiAdapterDesc;
 	com_ptr<IDXGIAdapter1> dxgiAdapter;
-	auto hr = DXGI_ERROR_UNSUPPORTED;
-	for (auto i = 0u; hr == DXGI_ERROR_UNSUPPORTED; ++i)
+	const auto useUMA = m_deviceType == DEVICE_UMA;
+	const auto useWARP = m_deviceType == DEVICE_WARP;
+	auto checkUMA = true, checkWARP = true;
+	auto hr = DXGI_ERROR_NOT_FOUND;
+	for (uint8_t n = 0; n < 3; ++n)
 	{
-		dxgiAdapter = nullptr;
-		ThrowIfFailed(factory->EnumAdapters1(i, &dxgiAdapter));
+		if (FAILED(hr)) hr = DXGI_ERROR_UNSUPPORTED;
+		for (auto i = 0u; hr == DXGI_ERROR_UNSUPPORTED; ++i)
+		{
+			dxgiAdapter = nullptr;
+			hr = factory->EnumAdapters1(i, &dxgiAdapter);
 
-		m_device = Device::MakeUnique();
-		hr = m_device->Create(dxgiAdapter.get(), D3D_FEATURE_LEVEL_11_0);
+			if (SUCCEEDED(hr) && dxgiAdapter)
+			{
+				dxgiAdapter->GetDesc1(&dxgiAdapterDesc);
+				if (checkWARP) hr = dxgiAdapterDesc.VendorId == 0x1414 && dxgiAdapterDesc.DeviceId == 0x8c ?
+					(useWARP ? hr : DXGI_ERROR_UNSUPPORTED) : (useWARP ? DXGI_ERROR_UNSUPPORTED : hr);
+			}
+
+			if (SUCCEEDED(hr))
+			{
+				m_device = Device::MakeUnique();
+				if (SUCCEEDED(m_device->Create(dxgiAdapter.get(), D3D_FEATURE_LEVEL_11_0)) && checkUMA)
+				{
+					D3D12_FEATURE_DATA_ARCHITECTURE feature = {};
+					const auto pDevice = static_cast<ID3D12Device*>(m_device->GetHandle());
+					if (SUCCEEDED(pDevice->CheckFeatureSupport(D3D12_FEATURE_ARCHITECTURE, &feature, sizeof(feature))))
+						hr = feature.UMA ? (useUMA ? hr : DXGI_ERROR_UNSUPPORTED) : (useUMA ? DXGI_ERROR_UNSUPPORTED : hr);
+				}
+			}
+		}
+
+		checkUMA = false;
+		if (n) checkWARP = false;
 	}
 
-	dxgiAdapter->GetDesc1(&dxgiAdapterDesc);
-	if (dxgiAdapterDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-		m_title += dxgiAdapterDesc.VendorId == 0x1414 && dxgiAdapterDesc.DeviceId == 0x8c ? L" (WARP)" : L" (Software)";
+	if (dxgiAdapterDesc.VendorId == 0x1414 && dxgiAdapterDesc.DeviceId == 0x8c) m_title += L" (WARP)";
+	else if (dxgiAdapterDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) m_title += L" (Software)";
+	//else m_title += wstring(L" - ") + dxgiAdapterDesc.Description;
 	ThrowIfFailed(hr);
 
 	// Create the command queue.
@@ -374,7 +401,13 @@ void FluidX::ParseCommandLineArgs(wchar_t* argv[], int argc)
 
 	for (auto i = 1; i < argc; ++i)
 	{
-		if (wcsncmp(argv[i], L"-gridSize", wcslen(argv[i])) == 0 ||
+		if (wcsncmp(argv[i], L"-warp", wcslen(argv[i])) == 0 ||
+			wcsncmp(argv[i], L"/warp", wcslen(argv[i])) == 0)
+			m_deviceType = DEVICE_WARP;
+		else if (wcsncmp(argv[i], L"-uma", wcslen(argv[i])) == 0 ||
+			wcsncmp(argv[i], L"/uma", wcslen(argv[i])) == 0)
+			m_deviceType = DEVICE_UMA;
+		else if (wcsncmp(argv[i], L"-gridSize", wcslen(argv[i])) == 0 ||
 			wcsncmp(argv[i], L"/gridSize", wcslen(argv[i])) == 0)
 		{
 			if (i + 1 < argc) m_gridSize.x = stoul(argv[++i]);
@@ -628,21 +661,20 @@ void FluidX::SaveImage(char const* fileName, Buffer* pImageBuffer, uint32_t w, u
 
 double FluidX::CalculateFrameStats(float* pTimeStep)
 {
-	static int frameCnt = 0;
-	static double elapsedTime = 0.0;
-	static double previousTime = 0.0;
+	static auto frameCnt = 0u;
+	static auto previousTime = 0.0;
 	const auto totalTime = m_timer.GetTotalSeconds();
 	++frameCnt;
 
-	const auto timeStep = static_cast<float>(totalTime - elapsedTime);
+	const auto timeStep = totalTime - previousTime;
 
 	// Compute averages over one second period.
-	if ((totalTime - elapsedTime) >= 1.0f)
+	if (timeStep >= 1.0)
 	{
-		float fps = static_cast<float>(frameCnt) / timeStep;	// Normalize to an exact second.
+		const auto fps = static_cast<float>(frameCnt / timeStep);	// Normalize to an exact second.
 
 		frameCnt = 0;
-		elapsedTime = totalTime;
+		previousTime = totalTime;
 
 		wstringstream windowText;
 		windowText << L"    fps: ";
@@ -672,8 +704,7 @@ double FluidX::CalculateFrameStats(float* pTimeStep)
 		SetCustomWindowText(windowText.str().c_str());
 	}
 
-	if (pTimeStep)* pTimeStep = static_cast<float>(totalTime - previousTime);
-	previousTime = totalTime;
+	if (pTimeStep) *pTimeStep = static_cast<float>(m_timer.GetElapsedSeconds());
 
 	return totalTime;
 }
