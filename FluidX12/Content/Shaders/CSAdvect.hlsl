@@ -64,7 +64,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 		float3 extForce = g_extForce * basis;
 		extForce = gridSize.z > 1 ? extForce * g_forceScl3D + vortForce : extForce;
 		u += extForce * timeStep;
-		color += g_impulse * timeStep * basis;
+		color = saturate(color + g_impulse * timeStep * basis);
 	}
 
 #ifndef _PRE_MULTIPLIED_

@@ -67,11 +67,8 @@ min16float4 main(PSIn input) : SV_TARGET
 	const float3 lightDir = normalize(localSpaceLightPt);
 #endif
 
-	// Transmittance
-	min16float transm = 1.0;
-
-	// In-scattered radiance
-	min16float3 scatter = 0.0;
+	// In-scattered radiance with inverted transmittance
+	min16float4 scatter = 0.0;
 
 	float t = 0.0;
 	min16float step = g_step;
@@ -79,6 +76,7 @@ min16float4 main(PSIn input) : SV_TARGET
 	for (uint i = 0; i < g_numSamples; ++i)
 	{
 		const float3 pos = rayOrigin + rayDir * t;
+		if (any(abs(pos) > 1.0)) break;
 		const float3 uvw = LocalToTex3DSpace(pos);
 
 		// Get a sample
@@ -88,7 +86,6 @@ min16float4 main(PSIn input) : SV_TARGET
 		//min16float4 color = GetSample(uvw, mip);
 		min16float4 color = GetSample(uvw);
 		min16float newStep = g_step;
-		float dDensity = 1.0;
 
 		// Skip empty space
 		if (color.w > ZERO_THRESHOLD)
@@ -97,32 +94,22 @@ min16float4 main(PSIn input) : SV_TARGET
 			// Point light direction in texture space
 			const float3 lightDir = normalize(localSpaceLightPt - pos);
 #endif
-
 			const float3 light = GetLight(pos, lightDir, shCoeffs); // Sample light
 
 			// Update step
-			dDensity = color.w - prevDensity;
-			const min16float opacity = saturate(color.w * step);
-			newStep = GetStep(dDensity, transm, opacity, g_step);
+			const min16float transm = 1.0 - scatter.w;
+			const float dDensity = color.w - prevDensity;
+			newStep = GetStep(dDensity, transm, color.w, g_step);
 			step = (step + newStep) * 0.5;
 			prevDensity = color.w;
 
 			// Accumulate color
-			const min16float tansl = GetTranslucency(color.w, step);
-			color.w = saturate(color.w * step);
-#ifdef _PRE_MULTIPLIED_
-			color.xyz = GetPremultiplied(color.xyz, step);
-#else
-			//color.xyz *= color.w;
+#ifndef _PRE_MULTIPLIED_
 			color.xyz *= color.w;
 #endif
-			color.xyz *= transm;
+			color.xyz *= min16float3(light);
+			scatter += color * ABSORPTION * transm;
 
-			//scatter += color.xyz;
-			scatter += color.xyz * min16float3(light);
-
-			// Attenuate ray-throughput
-			transm *= 1.0 - tansl;
 			if (transm < ZERO_THRESHOLD) break;
 		}
 
@@ -136,5 +123,5 @@ min16float4 main(PSIn input) : SV_TARGET
 
 	scatter.xyz /= 2.0 * PI;
 
-	return min16float4(scatter, 1.0 - transm);
+	return scatter;
 }
